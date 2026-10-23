@@ -418,8 +418,12 @@ const bleT = {
     const srv = await dev.gatt.connect();
     const s = await srv.getPrimaryService(SVC);
     this.ch = {};
-    for (const k of ['101', '109', '10a', '10b', '10c']) { try { this.ch[k] = await s.getCharacteristic(UUID(k)); } catch {} }
-    if (!this.ch['109'] || !this.ch['10a'] || !this.ch['10b']) throw new Error('Il firmware del DMXelf non espone le funzioni RDM (C109–C10B). Aggiornalo con l\'app ufficiale.');
+    for (const k of ['101', '109', '10a', '10b', '10c']) {
+      try { this.ch[k] = await s.getCharacteristic(UUID(k.slice(1))); log('rx', 'Caratteristica C' + k.toUpperCase() + ' OK'); }
+      catch (e) { log('er', 'Caratteristica C' + k.toUpperCase() + ': ' + e.message); }
+    }
+    const miss = ['109', '10a', '10b'].filter(k => !this.ch[k]);
+    if (miss.length) throw new Error('Caratteristiche RDM mancanti: ' + miss.map(k => 'C' + k.toUpperCase()).join(', '));
     this.ch['10a'].addEventListener('characteristicvaluechanged', e => this.onRdm(dv2a(e.target.value)));
     this.ch['10b'].addEventListener('characteristicvaluechanged', e => this.onScan(dv2a(e.target.value)));
     await gatt(() => this.ch['10a'].startNotifications());
