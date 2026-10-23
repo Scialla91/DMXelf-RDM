@@ -235,6 +235,35 @@ main { padding-block: 20px 24px; display: grid; gap: 22px; }
 .loading-line { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: .86rem; }
 .loading-line .spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: spin .8s linear infinite; }
 
+/* Home: due aree */
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.tile {
+  display: grid; gap: 10px; align-content: start; text-align: left; padding: 16px; min-height: 156px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-sm);
+  cursor: pointer; transition: border-color var(--ease), box-shadow var(--ease), transform var(--ease);
+}
+.tile:hover { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); box-shadow: var(--shadow); }
+.tile:active { transform: scale(.98); }
+.t-ico { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
+.tile b { font-size: 1.05rem; font-weight: 650; letter-spacing: -.01em; }
+.tile span { font-size: .82rem; color: var(--muted); line-height: 1.4; }
+
+/* Fader */
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.toolbar .grow { flex: 1; min-width: 0; }
+.faders { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.fd { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 8px 6px 7px; display: grid; gap: 6px; justify-items: center; min-width: 0; }
+.fd-name { width: 100%; height: 2.5em; font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--label); text-align: center; line-height: 1.25; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.fader { position: relative; width: 42px; height: 190px; border-radius: 12px; background: var(--surface-2); touch-action: none; cursor: ns-resize; overflow: hidden; -webkit-user-select: none; user-select: none; }
+.fader .fill { position: absolute; left: 0; right: 0; bottom: 0; background: var(--accent); }
+.fader .fill::before { content: ""; position: absolute; left: 8px; right: 8px; top: 4px; height: 3px; border-radius: 2px; background: var(--accent-ink); opacity: .75; }
+.fader.fine .fill { background: color-mix(in srgb, var(--accent) 55%, var(--surface-2)); }
+.fader:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.fd-val { width: 100%; height: 34px; text-align: center; padding: 0 2px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--text); font-weight: 650; font-variant-numeric: tabular-nums; font-size: .92rem; }
+.fd-val:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.fd-ch { font-size: .66rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+@media (max-width: 340px) { .faders { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
 /* Registro */
 details.log { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
 details.log summary { cursor: pointer; padding: 12px 16px; font-size: .78rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); list-style: none; display: flex; justify-content: space-between; }
@@ -336,6 +365,14 @@ const LAMP_ON_MODE = { 0:'Off', 1:'Da DMX', 2:'Sempre on', 3:'Dopo calibrazione'
 const POWER_STATE = { 0:'Spento', 1:'Shutdown', 2:'Standby', 0xFF:'Normale' };
 const UNITS = { 0:'', 1:'°C', 2:'V DC', 3:'V AC pk', 4:'V AC', 5:'A DC', 6:'A AC pk', 7:'A AC', 8:'Hz', 9:'Ω', 10:'W', 11:'kg', 12:'m',
   13:'m²', 14:'m³', 15:'kg/m³', 16:'m/s', 17:'m/s²', 18:'N', 19:'J', 20:'Pa', 21:'s', 22:'°', 23:'sr', 24:'cd', 25:'lm', 26:'lx', 27:'IRE', 28:'B' };
+// ANSI E1.20 Slot ID Definitions (nomi brevi) e tipi di slot secondari
+const SLOT_NAME = { 0x0001:'Intensity', 0x0002:'Master', 0x0101:'Pan', 0x0102:'Tilt', 0x0201:'Color wheel', 0x0202:'Cyan', 0x0203:'Yellow',
+  0x0204:'Magenta', 0x0205:'Red', 0x0206:'Green', 0x0207:'Blue', 0x0208:'Color corr.', 0x0209:'Color scroll', 0x0210:'Semaphore', 0x0211:'Amber',
+  0x0212:'White', 0x0213:'Warm white', 0x0214:'Cool white', 0x0215:'UV', 0x0216:'Hue', 0x0217:'Saturation', 0x0301:'Gobo', 0x0302:'Rot. gobo',
+  0x0303:'Prism', 0x0304:'Effects', 0x0401:'Iris', 0x0402:'Edge', 0x0403:'Frost', 0x0404:'Strobe', 0x0405:'Zoom', 0x0406:'Shutter',
+  0x0407:'Shutter rot.', 0x0408:'Douser', 0x0409:'Barn door', 0x0501:'Lamp ctrl', 0x0502:'Control', 0x0503:'Speed', 0x0504:'Macro',
+  0x0505:'Power', 0x0506:'Fan', 0x0507:'Heater', 0x0508:'Fountain' };
+const SLOT_TYPE = { 1:'fine', 2:'timing', 3:'speed', 4:'control', 5:'index', 6:'rotation', 7:'index/rot.' };
 const PREFIX = { 0:0, 1:-1, 2:-2, 3:-3, 4:-6, 5:-9, 6:-12, 0x11:1, 0x12:2, 0x13:3, 0x14:6, 0x15:9 };
 
 /* ---------- utilità ---------- */
@@ -421,7 +458,8 @@ const bleT = {
     const srv = await dev.gatt.connect();
     const s = await srv.getPrimaryService(SVC);
     this.ch = {};
-    for (const k of ['101', '109', '10a', '10b', '10c']) {
+    this.rtt = 0; this.sel = null;
+    for (const k of ['101', '102', '109', '10a', '10b', '10c']) {
       try { this.ch[k] = await s.getCharacteristic(UUID(k.slice(1))); log('rx', 'Caratteristica C' + k.toUpperCase() + ' OK'); }
       catch (e) { log('er', 'Caratteristica C' + k.toUpperCase() + ': ' + e.message); }
     }
@@ -483,9 +521,16 @@ const bleT = {
     for (let attempt = 0; attempt < 2; attempt++) {
       const frame = buildFrame(uid, cc, pid, data);
       this.rx = [];
+      // primo tentativo: attesa adattiva (4 x tempo medio di risposta, min 350 ms); secondo tentativo: 1300 ms
+      const wait = attempt === 0 && this.rtt ? Math.min(1300, Math.max(350, Math.round(this.rtt * 4 + 150))) : 1300;
+      const t0 = performance.now();
       const r = await new Promise(resolve => {
-        const t = setTimeout(() => { this.pending = null; resolve(null); }, 1300);
-        this.pending = { uid, cc, pid, resolve: x => { clearTimeout(t); this.pending = null; resolve(x); } };
+        const t = setTimeout(() => { this.pending = null; resolve(null); }, wait);
+        this.pending = { uid, cc, pid, resolve: x => {
+          clearTimeout(t); this.pending = null;
+          if (x) { const dt = performance.now() - t0; this.rtt = this.rtt ? this.rtt * 0.8 + dt * 0.2 : dt; }
+          resolve(x);
+        } };
         log('tx', 'C109 ' + hx(frame));
         this.write(this.ch['109'], frame, true).catch(e => { log('er', e.message); this.pending?.resolve(null); });
       });
@@ -507,26 +552,44 @@ const bleT = {
       } catch (e) { log('er', e.message); end(); }
     });
   },
-  async stopScan() { try { await this.write(this.ch['10b'], [0xA2, 0, 0, 0, 0], false); } catch {} this.scanCb?.done(); }
+  async stopScan() { try { await this.write(this.ch['10b'], [0xA2, 0, 0, 0, 0], false); } catch {} this.scanCb?.done(); },
+  // Uscita DMX (come l'app originale): comandi su C101, dati su C102
+  needDmx() { if (!this.ch['101'] || !this.ch['102']) throw new Error('Il DMXelf non espone C101/C102 per l\'uscita DMX'); },
+  async dmxCmd(b) { this.needDmx(); log('tx', 'C101 ' + hx(b)); await this.write(this.ch['101'], b, false); },
+  async dmxFrame(buf) {
+    this.needDmx();
+    for (let o = 0; o < 4; o++) { const st = 128 * o + 1; await this.write(this.ch['102'], [(st >> 8) & 255, st & 255, ...buf.slice(st, st + 128)], true); }
+    log('tx', 'C102 universo completo (4 pacchetti)');
+  },
+  async dmxChannel(ch, v) {
+    this.needDmx();
+    if (this.sel !== ch) { await this.write(this.ch['101'], [6, ch % 256, ch >> 8, 0, 0], false); this.sel = ch; }
+    await this.write(this.ch['102'], [v], true);
+  }
 };
 
 /* =====================================================================
    Trasporto demo (fixture simulate, nessun Bluetooth)
    ===================================================================== */
 function simFixture(o) { return Object.assign({ identify: 0, panInv: 0, tiltInv: 0, swap: 0, dispInv: 0, dispLevel: 200, lampState: 1, lampOnMode: 1, power: 0xFF, label: '' }, o); }
+// [tipo, id/primario, descrizione]
+const BEAM_SLOTS = [[0,0x0101],[1,0],[0,0x0102],[1,2],[0,0x0503,'Pan/Tilt speed'],[0,0x0001],[0,0x0404],[0,0x0201],[0,0x0301],[0,0x0303],
+  [0,0x0403],[0,0xFFFF,'Focus'],[0,0x0405],[0,0x0504],[0,0x0502,'Reset/Lamp'],[0,0x0501]];
+const WASH_SLOTS = [[0,0x0001],[1,0],[0,0x0404],[0,0x0205],[0,0x0206],[0,0x0207],[0,0x0212],[0,0x0208],[0,0x0504],[0,0x0405],[0,0x0101],[1,10],
+  [0,0x0102],[1,12],[0,0x0503],[0,0x0502],[0,0xFFFF],[0,0xFFFF],[0,0xFFFF],[0,0x0506],[0,0xFFFF]];
 const SIM = [
   simFixture({ uid: [0x7F, 0xF0, 0, 0, 1, 0x11], man: 'Demo Lighting', model: 'Beam 280 Demo', label: 'SX 1', addr: 1, pers: 1,
     modes: [[16, 'Standard'], [20, 'Extended'], [12, 'Compact']], hours: 1532, lamp: 412, sw: 'v2.4.1', modelId: 0x0210,
     sensors: [['Temperatura testa', 1, 0, 46, 21, 58, 0, 70], ['Temperatura base', 1, 0, 38, 20, 41, 0, 60], ['Ventola testa (rpm)', 0, 0, 3100, 2900, 3300, 0, 5000]],
-    pids: [0x80, 0x81, 0x82, 0xE0, 0xE1, 0x200, 0x201, 0x400, 0x401, 0x403, 0x404, 0x500, 0x501, 0x600, 0x601, 0x602, 0x1001, 0x1010, 0x90] }),
+    slots: BEAM_SLOTS, pids: [0x80, 0x81, 0x82, 0xE0, 0xE1, 0x120, 0x121, 0x200, 0x201, 0x400, 0x401, 0x403, 0x404, 0x500, 0x501, 0x600, 0x601, 0x602, 0x1001, 0x1010, 0x90] }),
   simFixture({ uid: [0x7F, 0xF0, 0, 0, 1, 0x12], man: 'Demo Lighting', model: 'Beam 280 Demo', label: 'SX 2', addr: 17, pers: 1,
     modes: [[16, 'Standard'], [20, 'Extended'], [12, 'Compact']], hours: 1498, lamp: 377, sw: 'v2.4.1', modelId: 0x0210,
     sensors: [['Temperatura testa', 1, 0, 81, 22, 84, 0, 70], ['Temperatura base', 1, 0, 42, 20, 45, 0, 60]],
-    pids: [0x80, 0x81, 0x82, 0xE0, 0xE1, 0x200, 0x201, 0x400, 0x401, 0x403, 0x404, 0x500, 0x501, 0x600, 0x601, 0x602, 0x1001, 0x1010, 0x90] }),
+    slots: BEAM_SLOTS, pids: [0x80, 0x81, 0x82, 0xE0, 0xE1, 0x120, 0x121, 0x200, 0x201, 0x400, 0x401, 0x403, 0x404, 0x500, 0x501, 0x600, 0x601, 0x602, 0x1001, 0x1010, 0x90] }),
   simFixture({ uid: [0x7F, 0xF1, 0, 0, 2, 0x40], man: 'Demo Lighting', model: 'Wash 19x15 Demo', label: '', addr: 101, pers: 2,
     modes: [[14, 'Basic'], [21, 'Standard'], [67, 'Pixel']], hours: 820, sw: 'v1.0.7', modelId: 0x0305,
     sensors: [['Temperatura LED', 1, 0, 52, 24, 60, 0, 75]],
-    pids: [0x80, 0x81, 0x82, 0xE0, 0xE1, 0x200, 0x201, 0x400, 0x501, 0x600, 0x601, 0x1001, 0x90] }),
+    slots: WASH_SLOTS, pids: [0x80, 0x81, 0x82, 0xE0, 0xE1, 0x120, 0x200, 0x201, 0x400, 0x501, 0x600, 0x601, 0x1001, 0x90] }),
   simFixture({ uid: [0x7F, 0xF2, 0, 0, 3, 0x07], man: 'Demo FX', model: 'Strobe Demo', label: 'Strobo palco', addr: 301, pers: 1,
     modes: [[4, '4 canali']], sw: '1.3', modelId: 0x0101, sensors: [], pids: [0x80, 0x81, 0x82, 0xE0, 0xE1] })
 ];
@@ -536,6 +599,9 @@ const demoT = {
   disconnect() { onDisconnected(); },
   async scan(known, onFound) { for (const f of SIM) { await sleep(320); onFound(f.uid.slice()); } await sleep(200); },
   async stopScan() {},
+  async dmxCmd(b) { log('tx', 'DEMO C101 ' + hx(b)); },
+  async dmxFrame() { log('tx', 'DEMO C102 universo completo'); },
+  async dmxChannel() { await sleep(8); },
   async request(uid, cc, pid, data = []) {
     await sleep(45);
     const f = SIM.find(x => uidStr(x.uid) === uidStr(uid)); if (!f) return null;
@@ -546,6 +612,8 @@ const demoT = {
     const mode = f.modes[f.pers - 1];
     if (cc === CC.GET) switch (pid) {
       case P.SUPPORTED_PARAMETERS: return ack(f.pids.flatMap(u16));
+      case P.SLOT_INFO: { const n = mode[0]; const sl = Array.from({ length: n }, (_, i) => (f.slots || [])[i] || [0, 0xFFFF]); return ack(sl.flatMap((x, i) => [...u16(i), x[0], ...u16(x[1])])); }
+      case P.SLOT_DESCRIPTION: { const i = rd16(data, 0), x = (f.slots || [])[i]; return x && x[2] ? ack([...u16(i), ...bytes(x[2])]) : nack(6); }
       case P.DEVICE_INFO: return ack([1, 0, ...u16(f.modelId), ...u16(0x0101), ...u32(0x020401), ...u16(mode[0]), f.pers, f.modes.length, ...u16(f.addr), 0, 0, f.sensors.length]);
       case P.SOFTWARE_VERSION_LABEL: return ack(bytes(f.sw));
       case P.MANUFACTURER_LABEL: return ack(bytes(f.man));
@@ -621,7 +689,7 @@ function decodeInfo(pd) {
    Stato applicazione
    ===================================================================== */
 const S = {
-  view: 'list', connected: false, connecting: false, deviceName: '', battery: null, fw: '',
+  view: 'home', pct: false, connected: false, connecting: false, deviceName: '', battery: null, fw: '',
   scanning: false, fixtures: new Map(), current: null, loadingDetail: false, confirm: null
 };
 (function loadSaved() {
@@ -641,8 +709,43 @@ function onStatus(v) {
   if (v[1]) S.fw = [v[1], ...[v[2], v[3], v[4]].filter(x => x).map(x => String(x).padStart(2, '0'))].join('.');
   render();
 }
+/* ---------- uscita DMX (Fixture Control) ---------- */
+const dmx = { buf: new Uint8Array(513), active: false, q: new Map(), scheduled: false };
+let dmxP = Promise.resolve();
+const dmxOp = fn => { const p = dmxP.then(fn, fn); dmxP = p.catch(() => {}); return p; };
+async function dmxPushFrame() { T.sel = null; await T.dmxCmd([4, 0, 0, 2, 0]); await T.dmxFrame(dmx.buf); await T.dmxCmd([2, 0, 0, 0, 0]); }
+function dmxBegin() {
+  return dmxOp(async () => {
+    if (dmx.active || !T) return;
+    try { await dmxPushFrame(); dmx.active = true; } catch (e) { log('er', 'DMX: ' + e.message); toast('Uscita DMX non avviata'); }
+  });
+}
+function dmxRelease() {
+  return dmxOp(async () => {
+    if (!dmx.active) return;
+    dmx.active = false; dmx.q.clear(); dmx.buf.fill(0);
+    if (!T) return;
+    try { await dmxPushFrame(); await sleep(500); await T.dmxCmd([2, 0, 0, 0, 0]); await T.dmxCmd([3, 0, 0, 0, 0xFE]); }
+    catch (e) { log('er', 'DMX stop: ' + e.message); }
+  });
+}
+function dmxSet(ch, v) {
+  dmx.buf[ch] = v;
+  if (!dmx.active || !T) return;
+  dmx.q.set(ch, v);
+  if (!dmx.scheduled) { dmx.scheduled = true; dmxOp(pump); }
+}
+async function pump() {
+  while (dmx.q.size && dmx.active && T) {
+    const [ch, v] = dmx.q.entries().next().value; dmx.q.delete(ch);
+    try { await T.dmxChannel(ch, v); } catch (e) { log('er', 'DMX: ' + e.message); dmx.q.clear(); }
+  }
+  dmx.scheduled = false;
+}
+
 function onDisconnected() {
   const was = S.connected;
+  dmx.active = false; dmx.q.clear(); dmx.buf.fill(0);
   S.connected = false; S.scanning = false; T = null;
   for (const f of S.fixtures.values()) { f.found = false; f.identify = false; }
   if (was) toast('DMXelf scollegato');
@@ -675,11 +778,12 @@ async function scan() {
   for (const f of S.fixtures.values()) f.found = false;
   render();
   const known = [...S.fixtures.values()].map(f => f.uid);
-  const found = [];
+  const found = [], t0 = performance.now();
   await T.scan(known, uid => { const f = fixtureFor(uid); if (!f.found) found.push(f); f.found = true; log('rx', 'Trovata ' + f.uidStr); render(); });
   S.scanning = false; render();
   toast(found.length ? `${found.length} fixture trovate` : 'Nessuna fixture RDM trovata');
   for (const f of found) await loadSummary(f);
+  log('rx', `Scansione completa: ${found.length} fixture in ${((performance.now() - t0) / 1000).toFixed(1)} s`);
   save(); render();
 }
 async function loadSummary(f) {
@@ -691,8 +795,9 @@ async function loadSummary(f) {
     const a = await get(f, P.DMX_START_ADDRESS); if (a.status === 'ack') f.address = rd16(a.pd, 0);
   }
   const l = await get(f, P.DEVICE_LABEL); if (l.status === 'ack') f.label = str(l.pd);
-  const m = await get(f, P.DEVICE_MODEL_DESCRIPTION); if (m.status === 'ack') f.model = str(m.pd);
-  const mf = await get(f, P.MANUFACTURER_LABEL); if (mf.status === 'ack') f.manufacturer = str(mf.pd);
+  // modello e produttore non cambiano: li chiedo solo se non li conosco già
+  if (!f.model) { const m = await get(f, P.DEVICE_MODEL_DESCRIPTION); if (m.status === 'ack') f.model = str(m.pd); }
+  if (!f.manufacturer) { const mf = await get(f, P.MANUFACTURER_LABEL); if (mf.status === 'ack') f.manufacturer = str(mf.pd); }
   render();
 }
 async function toggleIdentify(f) {
@@ -716,20 +821,17 @@ async function openDetail(f) {
   render(); window.scrollTo(0, 0);
   if (!S.connected) return;
   S.loadingDetail = true; render();
-  // parametri supportati (con eventuali pagine ACK_OVERFLOW)
-  let list = [], tries = 0, r;
-  do { r = await get(f, P.SUPPORTED_PARAMETERS); if (r.status === 'ack') for (let i = 0; i + 1 < r.pd.length; i += 2) list.push(rd16(r.pd, i)); }
-  while (r.status === 'ack' && r.overflow && ++tries < 6);
-  f.supported = r.status === 'ack' ? new Set(list) : null;
+  const t0 = performance.now();
+  await ensureSupported(f);
   if (S.current !== f) return;
-  await getInto(f, P.DEVICE_INFO, [], pd => { f.info = decodeInfo(pd); Object.assign(f, { address: f.info.address, footprint: f.info.footprint, personality: f.info.personality, personalityCount: f.info.personalityCount }); });
+  await getInto(f, P.DEVICE_INFO, [], pd => applyInfo(f, pd));
   render();
   await getInto(f, P.DEVICE_LABEL, [], pd => f.label = str(pd));
-  await getInto(f, P.DEVICE_MODEL_DESCRIPTION, [], pd => f.model = str(pd));
-  await getInto(f, P.MANUFACTURER_LABEL, [], pd => f.manufacturer = str(pd));
-  await getInto(f, P.SOFTWARE_VERSION_LABEL, [], pd => f.v.sw = str(pd));
+  if (!f.model) await getInto(f, P.DEVICE_MODEL_DESCRIPTION, [], pd => f.model = str(pd));
+  if (!f.manufacturer) await getInto(f, P.MANUFACTURER_LABEL, [], pd => f.manufacturer = str(pd));
+  if (!f.v.sw) await getInto(f, P.SOFTWARE_VERSION_LABEL, [], pd => f.v.sw = str(pd));
   render();
-  if (f.personalityCount) {
+  if (f.personalityCount && !(f.personalities && f.personalities.length === f.personalityCount)) {
     f.personalities = [];
     for (let n = 1; n <= f.personalityCount; n++)
       await getInto(f, P.DMX_PERSONALITY_DESCRIPTION, [n], pd => f.personalities.push({ n: pd[0], ch: rd16(pd, 1), name: str(pd.slice(3)) }));
@@ -742,18 +844,75 @@ async function openDetail(f) {
   await getInto(f, P.LAMP_ON_MODE, [], pd => f.v.lampOnMode = pd[0]);
   await getInto(f, P.POWER_STATE, [], pd => f.v.power = pd[0]);
   render();
-  await loadSensors(f, true);
+  await loadSensors(f, false);
   await getInto(f, P.PAN_INVERT, [], pd => f.v.panInv = pd[0]);
   await getInto(f, P.TILT_INVERT, [], pd => f.v.tiltInv = pd[0]);
   await getInto(f, P.PAN_TILT_SWAP, [], pd => f.v.swap = pd[0]);
   await getInto(f, P.DISPLAY_INVERT, [], pd => f.v.dispInv = pd[0]);
   await getInto(f, P.DISPLAY_LEVEL, [], pd => f.v.dispLevel = pd[0]);
+  log('rx', `Scheda RDM letta in ${((performance.now() - t0) / 1000).toFixed(1)} s`);
   S.loadingDetail = false; save(); render();
+}
+function applyInfo(f, pd) {
+  f.info = decodeInfo(pd);
+  Object.assign(f, { address: f.info.address, footprint: f.info.footprint, personality: f.info.personality, personalityCount: f.info.personalityCount });
+}
+async function ensureSupported(f) {
+  if (f.supported !== undefined) return;            // già letto in questa sessione
+  let list = [], tries = 0, r;
+  do { r = await get(f, P.SUPPORTED_PARAMETERS); if (r.status === 'ack') for (let i = 0; i + 1 < r.pd.length; i += 2) list.push(rd16(r.pd, i)); }
+  while (r.status === 'ack' && r.overflow && ++tries < 6);
+  f.supported = r.status === 'ack' ? new Set(list) : null;
+}
+
+/* ---------- Fixture Control: channel list via RDM ---------- */
+async function openFaders(f) {
+  S.current = f; S.view = 'faders'; render(); window.scrollTo(0, 0);
+  if (!S.connected) return;
+  dmxBegin();
+  const key = `${f.personality}/${f.footprint}`;
+  if (f.slots && f.slotsKey === key) return;
+  S.loadingSlots = true; render();
+  await loadSlots(f);
+  S.loadingSlots = false; render();
+}
+async function loadSlots(f) {
+  const t0 = performance.now();
+  await ensureSupported(f);
+  await getInto(f, P.DEVICE_INFO, [], pd => applyInfo(f, pd));
+  let slots = null;
+  if (supports(f, P.SLOT_INFO)) {
+    let raw = [], tries = 0, r;
+    do { r = await get(f, P.SLOT_INFO); if (r.status === 'ack') raw = raw.concat(r.pd); }
+    while (r.status === 'ack' && r.overflow && ++tries < 6);
+    if (raw.length >= 5) { slots = []; for (let i = 0; i + 4 < raw.length; i += 5) slots.push({ off: rd16(raw, i), type: raw[i + 2], label: rd16(raw, i + 3) }); }
+    else if (r.status === 'nack') { f.nack = f.nack || new Set(); f.nack.add(P.SLOT_INFO); }
+  }
+  if (slots && supports(f, P.SLOT_DESCRIPTION)) {
+    for (const sl of slots) {
+      const r = await get(f, P.SLOT_DESCRIPTION, u16(sl.off));
+      if (r.status === 'ack') sl.desc = str(r.pd.slice(2));
+      else if (r.status === 'nack' && (r.code === 0 || r.code === 5)) { f.nack = f.nack || new Set(); f.nack.add(P.SLOT_DESCRIPTION); break; }
+    }
+  }
+  f.slotsGeneric = !slots || !slots.length;
+  if (f.slotsGeneric) slots = Array.from({ length: f.footprint || 0 }, (_, i) => ({ off: i, generic: true }));
+  slots.forEach(sl => { sl.name = slotName(sl, slots); sl.fine = sl.type === 1; });
+  f.slots = slots; f.slotsKey = `${f.personality}/${f.footprint}`;
+  log('rx', `Channel list: ${slots.length} canali ${f.slotsGeneric ? '(numerati, la fixture non fornisce SLOT_INFO)' : 'via RDM'} in ${((performance.now() - t0) / 1000).toFixed(1)} s`);
+}
+function slotName(sl, all) {
+  if (sl.generic) return `Canale ${sl.off + 1}`;
+  if (sl.desc) return sl.desc;
+  if (!sl.type) return SLOT_NAME[sl.label] || `Canale ${sl.off + 1}`;
+  const pr = all.find(x => x.off === sl.label);
+  const base = pr ? (pr.desc || SLOT_NAME[pr.label] || `Canale ${pr.off + 1}`) : `Canale ${sl.off + 1}`;
+  return `${base} ${SLOT_TYPE[sl.type] || ''}`.trim();
 }
 async function loadSensors(f, withDefs) {
   const n = f.info?.sensorCount || 0;
   if (!n || !supports(f, P.SENSOR_VALUE)) return;
-  if (withDefs || !f.sensors) {
+  if (withDefs || !f.sensors || f.sensors.length !== n) {
     f.sensors = [];
     for (let i = 0; i < n; i++) await getInto(f, P.SENSOR_DEFINITION, [i], pd => f.sensors[i] = {
       type: pd[1], unit: pd[2], prefix: pd[3], rangeMin: rs16(pd, 4), rangeMax: rs16(pd, 6), normalMin: rs16(pd, 8), normalMax: rs16(pd, 10), name: str(pd.slice(13)) || `Sensore ${i + 1}` });
@@ -785,13 +944,17 @@ const spin = '<span class="spin" aria-hidden="true"></span>';
 const fxTitle = f => f.label || f.model || 'Fixture RDM';
 const fxRange = f => f.address ? (f.footprint ? `${pad3(f.address)}–${pad3(f.address + f.footprint - 1)}` : pad3(f.address)) : '—';
 
+let drag = null, renderQueued = false;
 function render() {
+  if (drag) { renderQueued = true; return; }          // non ridisegnare mentre muovi un fader
   const pill = $('#conn-pill');
   pill.className = 'pill' + (S.connected ? (T?.name === 'demo' ? ' demo' : ' on') : '');
   $('#conn-text').textContent = S.connected ? (T?.name === 'demo' ? 'Demo' : 'Collegato') : (S.connecting ? 'Collego…' : 'Non collegato');
   const app = $('#app');
   const focusId = document.activeElement?.id, selStart = document.activeElement?.selectionStart;
-  app.innerHTML = S.view === 'detail' && S.current ? detailView(S.current) : listView();
+  app.innerHTML = S.view === 'detail' && S.current ? detailView(S.current)
+    : S.view === 'faders' && S.current ? faderView(S.current)
+    : S.view === 'home' ? homeView() : listView(S.view === 'fc' ? 'fc' : 'rdm');
   for (const [id, val] of Object.entries(drafts)) { const el = document.getElementById(id); if (el && !el.disabled) el.value = val; }
   if (focusId) { const el = document.getElementById(focusId); if (el) { el.focus(); try { if (selStart != null) el.setSelectionRange(selStart, selStart); } catch {} } }
 }
@@ -829,7 +992,20 @@ function deviceCard() {
   </section>`;
 }
 
-function fixtureCard(f) {
+function homeView() {
+  return `${deviceCard()}
+  <section class="tiles" aria-label="Funzioni">
+    <button class="tile" type="button" data-act="nav" data-to="list">
+      <span class="t-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.8"/><rect x="4" y="14" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.8"/><path d="M14 6h6M14 9h4M14 16h6M14 19h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>
+      <b>RDM Control</b><span>Indirizzo, modo, ore, sensori e impostazioni via RDM</span>
+    </button>
+    <button class="tile" type="button" data-act="nav" data-to="fc">
+      <span class="t-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 3v18M12 3v18M18 3v18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".45"/><rect x="3.5" y="12" width="5" height="3.5" rx="1" fill="currentColor"/><rect x="9.5" y="6" width="5" height="3.5" rx="1" fill="currentColor"/><rect x="15.5" y="15" width="5" height="3.5" rx="1" fill="currentColor"/></svg></span>
+      <b>Fixture Control</b><span>Fader sui canali del modo attivo, letti dalla fixture via RDM</span>
+    </button>
+  </section>`;
+}
+function fixtureCard(f, area) {
   const off = S.connected && !f.found && !S.scanning;
   const mode = f.personality ? `Modo ${f.personality}/${f.personalityCount || '?'}${f.footprint ? ` · ${f.footprint} ch` : ''}` : '';
   return `
@@ -849,26 +1025,28 @@ function fixtureCard(f) {
     </div>
     <div class="fx-actions">
       <button class="btn ident-btn" type="button" data-act="ident" aria-pressed="${!!f.identify}" ${!S.connected || off ? 'disabled' : ''}><span class="bulb"></span>${f.identify ? 'Identify ON' : 'Identify'}</button>
-      <button class="btn primary" type="button" data-act="rdm" ${!S.connected || off ? 'disabled' : ''}>RDM ${ico.chev}</button>
+      ${area === 'fc'
+        ? `<button class="btn primary" type="button" data-act="faders" ${!S.connected || off ? 'disabled' : ''}>Fader ${ico.chev}</button>`
+        : `<button class="btn primary" type="button" data-act="rdm" ${!S.connected || off ? 'disabled' : ''}>RDM ${ico.chev}</button>`}
     </div>
   </article>`;
 }
 
-function listView() {
+function listView(area) {
   const all = [...S.fixtures.values()].sort((a, b) => ((!!b.found) - (!!a.found)) || ((a.address || 999) - (b.address || 999)));
   const shown = all;
   const foundN = all.filter(f => f.found).length;
   return `
-  ${deviceCard()}
+  <div><button class="btn ghost back" type="button" data-act="nav" data-to="home">${ico.back} Home</button></div>
   <section aria-labelledby="fx-title" style="display:grid;gap:12px">
     <div class="sec-head">
       <div>
-        <p class="sec-title">Linea DMX</p>
+        <p class="sec-title">${area === 'fc' ? 'Fixture Control' : 'RDM Control'}</p>
         <h2 class="page-title" id="fx-title">Fixture <span class="num" style="color:var(--muted);font-weight:500">${S.connected ? foundN : all.length}</span></h2>
       </div>
       <button class="btn ${S.scanning ? '' : 'primary'}" id="btn-scan" type="button" ${!S.connected ? 'disabled' : ''}>${S.scanning ? spin + ' Ferma' : ico.scan + ' Scansiona'}</button>
     </div>
-    ${shown.length ? `<div class="list">${shown.map(fixtureCard).join('')}</div>` : `
+    ${shown.length ? `<div class="list">${shown.map(f => fixtureCard(f, area)).join('')}</div>` : `
     <div class="empty">
       <b>${S.scanning ? 'Ricerca in corso…' : 'Nessuna fixture'}</b>
       <span>${S.connected ? 'Collega il DMXelf all\'ingresso DMX della prima fixture e premi Scansiona.' : 'Collega il DMXelf per cercare le fixture RDM sulla linea.'}</span>
@@ -1005,7 +1183,7 @@ function detailView(f) {
 
   return `
   <div class="detail-head">
-    <div><button class="btn ghost back" type="button" data-act="back">${ico.back} Fixture</button></div>
+    <div><button class="btn ghost back" type="button" data-act="nav" data-to="list">${ico.back} RDM Control</button></div>
     <div class="detail-title">
       <div class="fx-text">
         <div class="fx-brand">${esc(f.manufacturer || 'Fixture RDM')}</div>
@@ -1018,6 +1196,45 @@ function detailView(f) {
     ${!S.connected ? '<p class="note">DMXelf non collegato: dati dell\'ultima lettura.</p>' : ''}
   </div>
   ${sec.join('')}`;
+}
+
+const disp = v => S.pct ? Math.round(v / 2.55) : v;
+function faderView(f) {
+  const slots = f.slots || [];
+  const fresh = f.slots && f.slotsKey === `${f.personality}/${f.footprint}`;
+  const cards = (f.address ? slots : []).map(sl => {
+    const ch = f.address + sl.off; if (ch > 512) return '';
+    const v = dmx.buf[ch];
+    return `<div class="fd">
+      <div class="fd-name" title="${esc(sl.name)}">${esc(sl.name)}</div>
+      <div class="fader ${sl.fine ? 'fine' : ''}" data-ch="${ch}" role="slider" tabindex="0" aria-label="${esc(sl.name)}" aria-valuemin="0" aria-valuemax="255" aria-valuenow="${v}"><div class="fill" style="height:${(v / 2.55).toFixed(1)}%"></div></div>
+      <input class="fd-val" id="fv-${ch}" data-ch="${ch}" type="text" inputmode="numeric" value="${disp(v)}" aria-label="Valore ${esc(sl.name)}" ${!S.connected ? 'disabled' : ''}>
+      <div class="fd-ch">ch ${pad3(ch)}</div>
+    </div>`;
+  }).join('');
+  return `
+  <div class="detail-head">
+    <div><button class="btn ghost back" type="button" data-act="nav" data-to="fc">${ico.back} Fixture Control</button></div>
+    <div class="detail-title"><div class="fx-text">
+      <div class="fx-brand">${esc(f.manufacturer || 'Fixture RDM')}</div>
+      <h1>${esc(fxTitle(f))}</h1>
+      <div class="fx-meta"><span class="chip num">DMX ${esc(fxRange(f))}</span>${f.modeName ? `<span class="chip muted">${esc(f.modeName)}</span>` : f.personality ? `<span class="chip muted num">Modo ${f.personality}</span>` : ''}</div>
+    </div></div>
+    <div class="toolbar">
+      <button class="btn ident-btn grow" type="button" data-act="ident" aria-pressed="${!!f.identify}" ${!S.connected ? 'disabled' : ''}><span class="bulb"></span>${f.identify ? 'Identify ON' : 'Identify'}</button>
+      <div class="seg" role="group" aria-label="Unità">
+        <button type="button" data-act="unit" data-val="0" aria-pressed="${!S.pct}">0–255</button>
+        <button type="button" data-act="unit" data-val="1" aria-pressed="${S.pct}">%</button>
+      </div>
+      <button class="btn" type="button" data-act="zero" ${!S.connected ? 'disabled' : ''}>Azzera</button>
+    </div>
+    ${S.loadingSlots ? '<div class="loading-line"><span class="spin"></span>Lettura channel list via RDM…</div>' : ''}
+    ${!S.connected ? '<p class="note">DMXelf non collegato: i fader non inviano DMX.</p>' : ''}
+    ${fresh && f.slotsGeneric ? '<p class="note">Questa fixture non fornisce la channel list via RDM (SLOT_INFO): i canali sono solo numerati.</p>' : ''}
+    ${fresh && !f.address ? '<p class="note">Indirizzo DMX sconosciuto: impostalo da RDM Control.</p>' : ''}
+  </div>
+  ${cards ? `<section class="faders" aria-label="Canali">${cards}</section>` : (fresh && !S.loadingSlots ? '<div class="empty"><b>Nessun canale</b><span>La fixture non ha comunicato i canali del modo attivo.</span></div>' : '')}
+  ${dmx.active ? '<p class="note">Uscita DMX attiva. Tornando alla Home i canali vengono azzerati e l\'uscita si ferma.</p>' : ''}`;
 }
 
 function selField(id, label, map, cur, key, pid) {
@@ -1051,12 +1268,23 @@ document.addEventListener('click', async e => {
   if (b.id === 'btn-scan') return S.scanning ? T?.stopScan() : scan();
   const act = b.dataset.act; if (!act) return;
   const card = b.closest('[data-uid]');
+  if (act === 'nav') {
+    const to = b.dataset.to;
+    if (to === 'home' && dmx.active) { dmxRelease(); toast('Uscita DMX azzerata e fermata'); }
+    S.view = to; S.current = null; S.confirm = null; clearDrafts(); render(); window.scrollTo(0, 0); return;
+  }
+  if (act === 'unit') { S.pct = b.dataset.val === '1'; render(); return; }
   const f = card ? S.fixtures.get(card.dataset.uid) : S.current;
-  if (!f && act !== 'back') return;
+  if (!f) return;
   switch (act) {
     case 'ident': return toggleIdentify(f);
     case 'rdm': return openDetail(f);
-    case 'back': S.view = 'list'; S.current = null; S.confirm = null; clearDrafts(); render(); return;
+    case 'faders': return openFaders(f);
+    case 'zero': {
+      for (const sl of f.slots || []) { const ch = f.address + sl.off; if (ch >= 1 && ch <= 512) dmx.buf[ch] = 0; }
+      if (dmx.active) { dmx.q.clear(); dmxOp(dmxPushFrame).catch(e => log('er', 'DMX: ' + e.message)); }
+      render(); toast('Canali della fixture azzerati'); return;
+    }
     case 'addr-dec': case 'addr-inc': {
       const inp = $('#in-addr'); const n = Math.min(512, Math.max(1, (parseInt(inp.value, 10) || 1) + (act === 'addr-inc' ? 1 : -1)));
       inp.value = n; drafts['in-addr'] = String(n); return;
@@ -1111,7 +1339,43 @@ document.addEventListener('change', e => {
   if (e.target.tagName === 'SELECT') drafts[e.target.id] = e.target.value;
   if (e.target.id === 'in-disp' && S.current) { const n = Number(e.target.value); apply(S.current, P.DISPLAY_LEVEL, [n], 'Luminosità display applicata', async () => { S.current.v.dispLevel = n; }); }
 });
+/* fader: trascinamento relativo (nessun salto quando appoggi il dito) */
+function setFader(ch, v) {
+  v = Math.max(0, Math.min(255, Math.round(v)));
+  dmxSet(ch, v);
+  document.querySelectorAll(`.fader[data-ch="${ch}"]`).forEach(el => { el.firstElementChild.style.height = (v / 2.55).toFixed(1) + '%'; el.setAttribute('aria-valuenow', v); });
+  const inp = document.getElementById('fv-' + ch); if (inp && document.activeElement !== inp) inp.value = disp(v);
+}
+document.addEventListener('pointerdown', e => {
+  const el = e.target.closest('.fader'); if (!el || !S.connected) return;
+  e.preventDefault();
+  const ch = Number(el.dataset.ch);
+  drag = { el, ch, y0: e.clientY, v0: dmx.buf[ch], h: el.getBoundingClientRect().height };
+  try { el.setPointerCapture(e.pointerId); } catch {}
+});
+document.addEventListener('pointermove', e => {
+  if (!drag) return;
+  setFader(drag.ch, drag.v0 + (drag.y0 - e.clientY) / drag.h * 255);
+});
+const endDrag = () => { if (!drag) return; drag = null; if (renderQueued) { renderQueued = false; render(); } };
+document.addEventListener('pointerup', endDrag);
+document.addEventListener('pointercancel', endDrag);
+document.addEventListener('change', e => {
+  if (!e.target.classList.contains('fd-val')) return;
+  const ch = Number(e.target.dataset.ch), n = parseInt(e.target.value, 10);
+  if (isNaN(n)) { e.target.value = disp(dmx.buf[ch]); return; }
+  setFader(ch, S.pct ? Math.round(Math.max(0, Math.min(100, n)) * 2.55) : n);
+  e.target.value = disp(dmx.buf[ch]);
+});
 document.addEventListener('keydown', e => {
+  const fd = e.target.closest && e.target.closest('.fader');
+  if (fd) {
+    const ch = Number(fd.dataset.ch), step = e.shiftKey ? 10 : 1, cur = dmx.buf[ch];
+    const map = { ArrowUp: cur + step, ArrowRight: cur + step, ArrowDown: cur - step, ArrowLeft: cur - step, Home: 0, End: 255, PageUp: cur + 25, PageDown: cur - 25 };
+    if (e.key in map) { e.preventDefault(); setFader(ch, map[e.key]); }
+    return;
+  }
+  if (e.key === 'Enter' && e.target.classList && e.target.classList.contains('fd-val')) e.target.blur();
   if (e.key === 'Enter' && e.target.id === 'in-addr') document.querySelector('[data-act="addr-set"]')?.click();
   if (e.key === 'Enter' && e.target.id === 'in-label') document.querySelector('[data-act="label-set"]')?.click();
 });
