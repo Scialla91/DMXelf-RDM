@@ -294,6 +294,13 @@ details.log summary::-webkit-details-marker { display: none; }
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
+window.addEventListener('error', function (e) {
+  var m = document.getElementById('app');
+  if (m && !m.childElementCount) m.innerHTML = '<div class="empty"><b>Errore di avvio</b><span class="mono">' + String(e.message || e.error).replace(/</g, '&lt;') + ' (riga ' + e.lineno + ')</span></div>';
+});
+</script>
+<script>
+(function () {
 'use strict';
 /* =====================================================================
    Protocollo DMXelf (ricostruito dall'app Android com.dmxelf)
@@ -1111,4 +1118,5 @@ function toggleTheme() {
 
 log(navigator.bluetooth ? 'rx' : 'er', `Web Bluetooth ${navigator.bluetooth ? 'disponibile' : 'NON disponibile'} · ${navigator.userAgent}`);
 render();
+})();
 </script>
