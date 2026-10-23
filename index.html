@@ -414,7 +414,10 @@ const bleT = {
   async connect() {
     const dev = await navigator.bluetooth.requestDevice({ filters: [{ services: [SVC] }], optionalServices: [SVC] });
     this.dev = dev;
-    dev.addEventListener('gattserverdisconnected', () => onDisconnected());
+    this.onGone = this.onGone || (() => onDisconnected());
+    dev.removeEventListener('gattserverdisconnected', this.onGone);
+    dev.addEventListener('gattserverdisconnected', this.onGone);
+    this.rx = []; this.pending = null; this.scanCb = null;
     const srv = await dev.gatt.connect();
     const s = await srv.getPrimaryService(SVC);
     this.ch = {};
@@ -424,12 +427,14 @@ const bleT = {
     }
     const miss = ['109', '10a', '10b'].filter(k => !this.ch[k]);
     if (miss.length) throw new Error('Caratteristiche RDM mancanti: ' + miss.map(k => 'C' + k.toUpperCase()).join(', '));
-    this.ch['10a'].addEventListener('characteristicvaluechanged', e => this.onRdm(dv2a(e.target.value)));
-    this.ch['10b'].addEventListener('characteristicvaluechanged', e => this.onScan(dv2a(e.target.value)));
+    // un solo listener per caratteristica anche dopo scollega/ricollega
+    this.h = this.h || { a: e => this.onRdm(dv2a(e.target.value)), b: e => this.onScan(dv2a(e.target.value)), c: e => onStatus(dv2a(e.target.value)) };
+    for (const [k, fn] of [['10a', this.h.a], ['10b', this.h.b], ['10c', this.h.c]]) {
+      if (this.ch[k]) { this.ch[k].removeEventListener('characteristicvaluechanged', fn); this.ch[k].addEventListener('characteristicvaluechanged', fn); }
+    }
     await gatt(() => this.ch['10a'].startNotifications());
     await gatt(() => this.ch['10b'].startNotifications());
     if (this.ch['10c']) {
-      this.ch['10c'].addEventListener('characteristicvaluechanged', e => onStatus(dv2a(e.target.value)));
       try { await gatt(() => this.ch['10c'].startNotifications()); } catch {}
     }
     await this.auth();
