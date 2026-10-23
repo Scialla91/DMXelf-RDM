@@ -646,7 +646,8 @@ async function connect(demo) {
     log('rx', 'Collegato a ' + S.deviceName);
   } catch (e) {
     T = null;
-    if (e && e.name !== 'NotFoundError') { toast(e.message || 'Collegamento non riuscito'); log('er', e.message || String(e)); }
+    const msg = `${e?.name || 'Errore'}: ${e?.message || String(e)}`;
+    toast(msg); log('er', 'Collegamento: ' + msg); $('#log-box').open = true;
   }
   S.connecting = false; render();
 }
@@ -1108,5 +1109,6 @@ function toggleTheme() {
 }
 (function initTheme() { const t = store.get('dmxelf.theme', null); if (t) document.documentElement.dataset.theme = t; })();
 
+log(navigator.bluetooth ? 'rx' : 'er', `Web Bluetooth ${navigator.bluetooth ? 'disponibile' : 'NON disponibile'} · ${navigator.userAgent}`);
 render();
 </script>
