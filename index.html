@@ -1,0 +1,1112 @@
+<title>DMXelf RDM</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+/* Layout: colonna unica da telefono (max 640px), header sfocato fisso, liste a card, scheda RDM a sezioni.
+   Token ripresi da DataFixture (style.css): stessi colori, raggi, ombre e font di sistema. */
+:root {
+  --bg: #f4f6fa;
+  --surface: #ffffff;
+  --surface-2: #eef1f6;
+  --border: #e1e6ee;
+  --text: #172033;
+  --muted: #627088;
+  --label: #4a5873;
+  --accent: #3b64f0;
+  --accent-ink: #ffffff;
+  --accent-soft: #e8eeff;
+  --ok: #1d8f5a;
+  --ok-soft: #e3f5ec;
+  --warn: #b26f00;
+  --warn-soft: #fff3dc;
+  --danger: #cf3b33;
+  --danger-soft: #fde9e7;
+  --shadow-sm: 0 1px 2px rgba(23,32,51,.06);
+  --shadow: 0 1px 2px rgba(23,32,51,.05), 0 8px 24px rgba(23,32,51,.07);
+  --shadow-lg: 0 12px 40px rgba(23,32,51,.18);
+  --radius: 16px;
+  --radius-sm: 12px;
+  --ease: 160ms ease;
+  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1118; --surface: #171b25; --surface-2: #1f2430; --border: #2a3040;
+    --text: #e8ebf2; --muted: #98a2b6; --label: #a9b3c7;
+    --accent: #7b9bff; --accent-ink: #0e1118; --accent-soft: #212c4d;
+    --ok: #4cc38a; --ok-soft: #15301f; --warn: #f2b54a; --warn-soft: #33270f; --danger: #ff7a70; --danger-soft: #3a1a18;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,.4); --shadow: 0 1px 2px rgba(0,0,0,.35), 0 8px 24px rgba(0,0,0,.35); --shadow-lg: 0 12px 40px rgba(0,0,0,.6);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1118; --surface: #171b25; --surface-2: #1f2430; --border: #2a3040;
+  --text: #e8ebf2; --muted: #98a2b6; --label: #a9b3c7;
+  --accent: #7b9bff; --accent-ink: #0e1118; --accent-soft: #212c4d;
+  --ok: #4cc38a; --ok-soft: #15301f; --warn: #f2b54a; --warn-soft: #33270f; --danger: #ff7a70; --danger-soft: #3a1a18;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.4); --shadow: 0 1px 2px rgba(0,0,0,.35), 0 8px 24px rgba(0,0,0,.35); --shadow-lg: 0 12px 40px rgba(0,0,0,.6);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 15px/1.55 var(--font);
+  transition: background var(--ease), color var(--ease);
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--surface); }
+[hidden] { display: none !important; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+button, input, select { font: inherit; color: inherit; }
+.wrap { max-width: 640px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.num { font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--mono); font-size: .86em; letter-spacing: .01em; }
+
+/* Header */
+.topbar {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: saturate(1.4) blur(10px); -webkit-backdrop-filter: saturate(1.4) blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+.bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; height: 60px; }
+.logo { display: inline-flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.08rem; letter-spacing: -.01em; min-width: 0; }
+.logo svg { color: var(--accent); flex: none; }
+.bar-actions { display: flex; gap: 8px; align-items: center; }
+.icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 42px; height: 42px; padding: 0; color: var(--text); background: var(--surface-2);
+  border: 1px solid transparent; border-radius: 12px; cursor: pointer;
+  transition: background var(--ease), border-color var(--ease), transform var(--ease);
+}
+.icon-btn:hover { border-color: var(--border); background: var(--accent-soft); }
+.icon-btn:active { transform: scale(.96); }
+#theme .i-sun { display: none; }
+:root[data-theme="dark"] #theme .i-moon { display: none; }
+:root[data-theme="dark"] #theme .i-sun { display: block; }
+
+.pill { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 11px; border-radius: 999px; font-size: .8rem; font-weight: 650; background: var(--surface-2); color: var(--muted); white-space: nowrap; }
+.pill .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.pill.on { background: var(--ok-soft); color: var(--ok); }
+.pill.demo { background: var(--warn-soft); color: var(--warn); }
+
+main { padding-block: 20px 24px; display: grid; gap: 22px; }
+
+/* Bottoni */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  font-weight: 600; font-size: .9rem; text-decoration: none; white-space: nowrap;
+  color: var(--text); background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 0 16px; min-height: 44px; cursor: pointer;
+  transition: background var(--ease), border-color var(--ease), transform var(--ease), color var(--ease);
+}
+.btn:hover:not(:disabled) { background: var(--surface-2); border-color: var(--muted); }
+.btn:active:not(:disabled) { transform: scale(.97); }
+.btn:disabled { opacity: .4; cursor: default; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.primary:hover:not(:disabled) { background: var(--accent); filter: brightness(1.08); }
+.btn.ghost { background: transparent; color: var(--muted); }
+.btn.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, var(--border)); }
+.btn.danger.solid { background: var(--danger); color: #fff; border-color: var(--danger); }
+.btn.block { width: 100%; }
+.btn .spin { width: 15px; height: 15px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Pannello DMXelf */
+.device {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow-sm); padding: 16px; display: grid; gap: 14px;
+}
+.device-head { display: flex; align-items: center; gap: 14px; }
+.device-ico { flex: none; width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
+.device-text { min-width: 0; flex: 1; }
+.device-name { font-weight: 650; font-size: 1.02rem; overflow-wrap: anywhere; }
+.device-sub { color: var(--muted); font-size: .86rem; }
+.device-meta { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 5px; background: var(--accent-soft); color: var(--accent); font-size: .78rem; font-weight: 600; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+.chip.muted { background: var(--surface-2); color: var(--muted); }
+.note { margin: 0; font-size: .86rem; color: var(--muted); }
+.note strong { color: var(--text); font-weight: 600; }
+
+/* Sezione lista */
+.sec-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.sec-title { font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin: 0; }
+.page-title { font-size: 1.35rem; letter-spacing: -.01em; margin: 2px 0 0; }
+.list { display: grid; gap: 12px; }
+
+.fx {
+  position: relative; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-sm); padding: 14px;
+  display: grid; gap: 12px; transition: border-color var(--ease), box-shadow var(--ease), opacity var(--ease);
+}
+.fx.is-ident { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.fx.offline { opacity: .6; }
+.fx-top { display: flex; gap: 12px; align-items: flex-start; }
+.fx-addr {
+  flex: none; width: 58px; padding: 7px 0 6px; border-radius: 12px; background: var(--surface-2);
+  text-align: center; line-height: 1.1;
+}
+.fx-addr b { display: block; font-size: 1.15rem; font-weight: 700; letter-spacing: -.01em; }
+.fx-addr span { font-size: .66rem; font-weight: 700; letter-spacing: .08em; color: var(--muted); text-transform: uppercase; }
+.fx-text { min-width: 0; flex: 1; display: grid; gap: 2px; }
+.fx-brand { font-size: .74rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); overflow-wrap: anywhere; }
+.fx-name { font-size: 1.04rem; font-weight: 650; line-height: 1.3; overflow-wrap: anywhere; }
+.fx-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.fx-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ident-btn[aria-pressed="true"], .ident-btn[aria-pressed="true"]:hover:not(:disabled) { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.ident-btn .bulb { width: 9px; height: 9px; border-radius: 50%; background: currentColor; opacity: .5; }
+.ident-btn[aria-pressed="true"] .bulb { opacity: 1; animation: blink 1s steps(2, start) infinite; }
+@keyframes blink { to { opacity: .2; } }
+
+.empty {
+  border: 1px dashed var(--border); border-radius: var(--radius); padding: 28px 18px;
+  text-align: center; color: var(--muted); display: grid; gap: 6px; justify-items: center;
+}
+.empty b { color: var(--text); font-weight: 650; }
+
+/* Scheda RDM */
+.back { display: inline-flex; align-items: center; gap: 6px; padding: 0 12px 0 8px; }
+.detail-head { display: grid; gap: 12px; }
+.detail-title { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; }
+.detail-title .fx-text { gap: 3px; }
+.detail-title h1 { margin: 0; font-size: 1.35rem; letter-spacing: -.01em; line-height: 1.25; overflow-wrap: anywhere; text-wrap: balance; }
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-sm); }
+.panel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 16px 0; }
+.panel-body { padding: 12px 16px 16px; display: grid; gap: 14px; }
+.rows { display: grid; margin: 0; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 46px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.row:last-child { border-bottom: 0; }
+.row dt, .row .k { color: var(--label); font-size: .86rem; font-weight: 600; }
+.row dd { margin: 0; text-align: right; min-width: 0; overflow-wrap: anywhere; font-weight: 550; }
+.row .v-muted { color: var(--muted); font-weight: 500; }
+.field { display: grid; gap: 7px; }
+.field label, .field .lbl { font-size: .78rem; font-weight: 600; color: var(--label); }
+.inline { display: flex; gap: 8px; align-items: stretch; }
+.inline > .grow { flex: 1; min-width: 0; }
+.input, .select {
+  height: 46px; width: 100%; padding: 0 12px; background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-sm);
+  transition: border-color var(--ease), box-shadow var(--ease);
+}
+.input:focus, .select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.input.addr { text-align: center; font-size: 1.15rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.step { width: 46px; flex: none; padding: 0; font-size: 1.2rem; }
+.hint { font-size: .8rem; color: var(--muted); }
+
+.seg { display: inline-flex; padding: 3px; gap: 2px; background: var(--surface-2); border-radius: 12px; }
+.seg button { min-width: 52px; height: 36px; padding: 0 10px; font-size: .82rem; font-weight: 650; color: var(--muted); background: transparent; border: 0; border-radius: 9px; cursor: pointer; transition: background var(--ease), color var(--ease); }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--accent); box-shadow: var(--shadow-sm); }
+
+.switch { position: relative; flex: none; width: 46px; height: 28px; border-radius: 999px; background: var(--border); border: 0; padding: 0; cursor: pointer; transition: background var(--ease); }
+.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: var(--surface); box-shadow: var(--shadow-sm); transition: transform var(--ease); }
+.switch[aria-checked="true"] { background: var(--accent); }
+.switch[aria-checked="true"]::after { transform: translateX(18px); }
+.switch:disabled { opacity: .5; }
+
+.range { width: 100%; accent-color: var(--accent); }
+
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.stat { background: var(--surface-2); border-radius: 12px; padding: 12px; display: grid; gap: 2px; }
+.stat .k { font-size: .74rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.stat .v { font-size: 1.3rem; font-weight: 700; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.stat .v small { font-size: .8rem; font-weight: 600; color: var(--muted); margin-left: 3px; }
+
+.sensor { display: grid; gap: 6px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.sensor:last-child { border-bottom: 0; }
+.sensor-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.sensor-name { font-weight: 600; font-size: .92rem; overflow-wrap: anywhere; }
+.sensor-val { font-weight: 700; font-size: 1.1rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sensor-val.warn { color: var(--warn); }
+.sensor-sub { display: flex; justify-content: space-between; gap: 10px; font-size: .78rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.meter { position: relative; height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.meter i { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 999px; background: var(--accent); }
+.meter i.warn { background: var(--warn); }
+
+.confirm { display: grid; gap: 10px; padding: 12px; border-radius: 12px; background: var(--danger-soft); }
+.confirm p { margin: 0; font-size: .88rem; }
+.confirm .inline > * { flex: 1; }
+.actions-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.loading-line { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: .86rem; }
+.loading-line .spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: spin .8s linear infinite; }
+
+/* Registro */
+details.log { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+details.log summary { cursor: pointer; padding: 12px 16px; font-size: .78rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); list-style: none; display: flex; justify-content: space-between; }
+details.log summary::-webkit-details-marker { display: none; }
+.log-body { max-height: 260px; overflow: auto; padding: 0 16px 14px; font-family: var(--mono); font-size: .72rem; line-height: 1.5; color: var(--muted); }
+.log-body div { white-space: pre-wrap; word-break: break-all; }
+.log-body .tx { color: var(--accent); }
+.log-body .rx { color: var(--ok); }
+.log-body .er { color: var(--danger); }
+
+/* Toast */
+.toast {
+  position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translate(-50%, 20px);
+  max-width: calc(100% - 32px); padding: 11px 16px; border-radius: 12px; background: var(--text); color: var(--bg);
+  font-size: .9rem; font-weight: 600; box-shadow: var(--shadow-lg); opacity: 0; pointer-events: none; z-index: 50;
+  transition: opacity var(--ease), transform var(--ease);
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+@media (max-width: 380px) {
+  .fx-actions, .actions-grid, .stats { grid-template-columns: 1fr; }
+}
+</style>
+
+<header class="topbar">
+  <div class="wrap bar">
+    <div class="logo">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M7 4h10l-2 6H9L7 4Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <path d="M9.5 10 6 21M14.5 10 18 21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".55"/>
+        <path d="M12 13v5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>
+      <span>DMXelf RDM</span>
+    </div>
+    <div class="bar-actions">
+      <span class="pill" id="conn-pill"><span class="dot"></span><span id="conn-text">Non collegato</span></span>
+      <button class="icon-btn" id="theme" type="button" aria-label="Cambia tema">
+        <svg class="i-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+        <svg class="i-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.8"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap" id="app"></main>
+
+<div class="wrap" style="padding-block: 0 40px">
+  <details class="log" id="log-box">
+    <summary><span>Registro comunicazione</span><span id="log-count">0</span></summary>
+    <div class="log-body" id="log"></div>
+  </details>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+'use strict';
+/* =====================================================================
+   Protocollo DMXelf (ricostruito dall'app Android com.dmxelf)
+   C101 autenticazione · C109 TX RDM · C10A RX RDM · C10B ricerca · C10C batteria/versione
+   ===================================================================== */
+const UUID = n => `9ecac1${n}-8000-0010-8000-00805f9bc05e`;
+const SVC = UUID('00');
+const SRC_UID = [0x43, 0x54, 0x81, 0x8F, 0xC3, 0x23];   // UID controller usato dall'app originale
+const CC = { DISC: 0x10, GET: 0x20, SET: 0x30 };
+const P = {
+  SUPPORTED_PARAMETERS: 0x0050, DEVICE_INFO: 0x0060, FACTORY_DEFAULTS: 0x0090,
+  LANGUAGE: 0x00B0, SOFTWARE_VERSION_LABEL: 0x00C0,
+  DEVICE_MODEL_DESCRIPTION: 0x0080, MANUFACTURER_LABEL: 0x0081, DEVICE_LABEL: 0x0082,
+  DMX_PERSONALITY: 0x00E0, DMX_PERSONALITY_DESCRIPTION: 0x00E1, DMX_START_ADDRESS: 0x00F0,
+  SLOT_INFO: 0x0120, SLOT_DESCRIPTION: 0x0121,
+  SENSOR_DEFINITION: 0x0200, SENSOR_VALUE: 0x0201,
+  DEVICE_HOURS: 0x0400, LAMP_HOURS: 0x0401, LAMP_STATE: 0x0403, LAMP_ON_MODE: 0x0404,
+  DISPLAY_INVERT: 0x0500, DISPLAY_LEVEL: 0x0501,
+  PAN_INVERT: 0x0600, TILT_INVERT: 0x0601, PAN_TILT_SWAP: 0x0602,
+  IDENTIFY_DEVICE: 0x1000, RESET_DEVICE: 0x1001, POWER_STATE: 0x1010, PERFORM_SELFTEST: 0x1020
+};
+// Lunghezza massima di risposta attesa per PID: tabella identica a quella dell'app (replaceCmdHeadTwoBytesByRPL)
+const RESP_LEN = { 1:0, 2:32, 3:32, 288:254, 289:58, 80:254, 224:26, 225:59, 96:43, 128:56, 129:56, 130:56, 240:26, 176:26,
+  192:56, 144:25, 1024:28, 1025:28, 1536:25, 1537:25, 1538:25, 1027:25, 1028:25, 1280:25, 1281:25, 4096:25, 4097:24,
+  4112:25, 4128:25, 512:69, 513:33 };
+const REQUIRED = new Set([P.DEVICE_INFO, P.SUPPORTED_PARAMETERS, P.SOFTWARE_VERSION_LABEL, P.DMX_START_ADDRESS, P.IDENTIFY_DEVICE]);
+const NACK = { 0:'Parametro non supportato', 1:'Formato non valido', 2:'Guasto hardware', 3:'Rifiutato dal proxy', 4:'Protetto da scrittura',
+  5:'Comando non supportato', 6:'Valore fuori range', 7:'Buffer pieno', 8:'Pacchetto troppo grande', 9:'Sub-device fuori range' };
+
+// ANSI E1.20 tabelle valori
+const LAMP_STATE = { 0:'Spenta', 1:'Accesa', 2:'Innesco', 3:'Standby', 4:'Assente', 0x7F:'Errore' };
+const LAMP_ON_MODE = { 0:'Off', 1:'Da DMX', 2:'Sempre on', 3:'Dopo calibrazione' };
+const POWER_STATE = { 0:'Spento', 1:'Shutdown', 2:'Standby', 0xFF:'Normale' };
+const UNITS = { 0:'', 1:'°C', 2:'V DC', 3:'V AC pk', 4:'V AC', 5:'A DC', 6:'A AC pk', 7:'A AC', 8:'Hz', 9:'Ω', 10:'W', 11:'kg', 12:'m',
+  13:'m²', 14:'m³', 15:'kg/m³', 16:'m/s', 17:'m/s²', 18:'N', 19:'J', 20:'Pa', 21:'s', 22:'°', 23:'sr', 24:'cd', 25:'lm', 26:'lx', 27:'IRE', 28:'B' };
+const PREFIX = { 0:0, 1:-1, 2:-2, 3:-3, 4:-6, 5:-9, 6:-12, 0x11:1, 0x12:2, 0x13:3, 0x14:6, 0x15:9 };
+
+/* ---------- utilità ---------- */
+const $ = s => document.querySelector(s);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const hx = a => Array.from(a, b => (b & 255).toString(16).padStart(2, '0')).join(' ').toUpperCase();
+const uidStr = u => hx(u.slice(0, 2)).replace(' ', '') + ':' + hx(u.slice(2)).replace(/ /g, '');
+const u16 = v => [(v >> 8) & 255, v & 255];
+const u32 = v => [(v >>> 24) & 255, (v >> 16) & 255, (v >> 8) & 255, v & 255];
+const rd16 = (a, i) => ((a[i] << 8) | a[i + 1]) >>> 0;
+const rs16 = (a, i) => { const v = rd16(a, i); return v & 0x8000 ? v - 0x10000 : v; };
+const rd32 = (a, i) => ((a[i] << 24) >>> 0) + (a[i + 1] << 16) + (a[i + 2] << 8) + a[i + 3];
+const str = a => String.fromCharCode(...a.filter(b => b !== 0)).trim();
+const bytes = s => Array.from(s, c => c.charCodeAt(0) & 255);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+const pad3 = n => String(n).padStart(3, '0');
+const fmtInt = n => Number(n).toLocaleString('it-IT');
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+};
+
+/* ---------- registro ---------- */
+let logN = 0;
+function log(kind, text) {
+  const box = $('#log'); const d = document.createElement('div');
+  d.className = kind; d.textContent = `${new Date().toLocaleTimeString('it-IT')} ${kind.toUpperCase()} ${text}`;
+  box.prepend(d); while (box.childElementCount > 250) box.lastChild.remove();
+  $('#log-count').textContent = ++logN;
+}
+let toastT;
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+/* ---------- pacchetto RDM ---------- */
+let tn = 0;
+function buildFrame(uid, cc, pid, data = []) {
+  tn = (tn + 1) % 255;
+  const f = [0, 0, 0xCC, 0x01, 24 + data.length, ...uid, ...SRC_UID, tn, 1, 0, 0, 0, cc, ...u16(pid), data.length, ...data];
+  const sum = f.reduce((s, b) => s + b, 0);
+  f.push((sum >> 8) & 255, sum & 255);
+  const L = RESP_LEN[pid];
+  if (L > 0) { const h = L + 2; f[0] = (h >> 8) & 255; f[1] = h & 255; }   // intestazione: byte di risposta attesi
+  return f;
+}
+function splitFrames(buf, onFrame) {
+  for (;;) {
+    const i = buf.indexOf(0xCC);
+    if (i < 0) return [];
+    if (i > 0) buf = buf.slice(i);
+    if (buf.length < 3) return buf;
+    const len = buf[2];
+    if (len < 24) { buf = buf.slice(1); continue; }
+    if (buf.length < len + 2) return buf;
+    let s = 0; for (let k = 0; k < len; k++) s += buf[k];
+    if (s !== ((buf[len] << 8) | buf[len + 1])) { log('er', 'Checksum errato, scarto'); buf = buf.slice(1); continue; }
+    onFrame(buf.slice(0, len + 2)); buf = buf.slice(len + 2);
+  }
+}
+function parseFrame(f) {
+  const pdl = f[23];
+  return { src: f.slice(9, 15), rtype: f[16], cc: f[20], pid: rd16(f, 21), pd: f.slice(24, 24 + pdl) };
+}
+
+/* =====================================================================
+   Trasporto Bluetooth reale
+   ===================================================================== */
+let gq = Promise.resolve();
+const gatt = fn => { const p = gq.then(fn, fn); gq = p.catch(() => {}); return p; };
+const dv2a = dv => Array.from(new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength));
+
+const bleT = {
+  name: 'ble', dev: null, ch: {}, rx: [], pending: null, scanCb: null,
+  async connect() {
+    const dev = await navigator.bluetooth.requestDevice({ filters: [{ services: [SVC] }], optionalServices: [SVC] });
+    this.dev = dev;
+    dev.addEventListener('gattserverdisconnected', () => onDisconnected());
+    const srv = await dev.gatt.connect();
+    const s = await srv.getPrimaryService(SVC);
+    this.ch = {};
+    for (const k of ['101', '109', '10a', '10b', '10c']) { try { this.ch[k] = await s.getCharacteristic(UUID(k)); } catch {} }
+    if (!this.ch['109'] || !this.ch['10a'] || !this.ch['10b']) throw new Error('Il firmware del DMXelf non espone le funzioni RDM (C109–C10B). Aggiornalo con l\'app ufficiale.');
+    this.ch['10a'].addEventListener('characteristicvaluechanged', e => this.onRdm(dv2a(e.target.value)));
+    this.ch['10b'].addEventListener('characteristicvaluechanged', e => this.onScan(dv2a(e.target.value)));
+    await gatt(() => this.ch['10a'].startNotifications());
+    await gatt(() => this.ch['10b'].startNotifications());
+    if (this.ch['10c']) {
+      this.ch['10c'].addEventListener('characteristicvaluechanged', e => onStatus(dv2a(e.target.value)));
+      try { await gatt(() => this.ch['10c'].startNotifications()); } catch {}
+    }
+    await this.auth();
+    return dev.name || 'DMXelf';
+  },
+  disconnect() { try { this.dev?.gatt?.disconnect(); } catch {} },
+  async write(ch, data, noResp) {
+    for (let i = 0; i < data.length; i += 20) {
+      const part = new Uint8Array(data.slice(i, i + 20));
+      await gatt(() => noResp && ch.writeValueWithoutResponse ? ch.writeValueWithoutResponse(part)
+        : ch.writeValueWithResponse ? ch.writeValueWithResponse(part) : ch.writeValue(part));
+      if (i + 20 < data.length) await sleep(10);
+    }
+  },
+  async auth() {
+    const c = this.ch['101']; if (!c) return;
+    const req = [0x50, 0, 0, 0, 1]; for (let i = 0; i < 16; i++) req.push(Math.floor(Math.random() * 10));
+    const a = req.slice(5, 13).reduce((s, b) => s + b, 0), b = req.slice(13, 21).reduce((s, x) => s + x, 0);
+    const expect = b ? a % b : -1;
+    await new Promise(async resolve => {
+      const h = e => {
+        const v = dv2a(e.target.value);
+        if (v.length === 17 && v[0] === 0x60) { log('rx', 'AUTH ' + hx(v)); done(((v[15] << 8) | v[16]) === expect ? 'Autenticazione OK' : 'Autenticazione: codice diverso dall\'atteso'); }
+      };
+      const done = msg => { clearTimeout(t); c.removeEventListener('characteristicvaluechanged', h); gatt(() => c.stopNotifications()).catch(() => {}); log(msg.includes('OK') ? 'rx' : 'er', msg); resolve(); };
+      const t = setTimeout(() => done('Autenticazione: nessuna risposta (proseguo)'), 3000);
+      c.addEventListener('characteristicvaluechanged', h);
+      try { await gatt(() => c.startNotifications()); log('tx', 'AUTH ' + hx(req)); await this.write(c, req, false); }
+      catch (e) { done('Autenticazione non riuscita: ' + e.message); }
+    });
+  },
+  onRdm(v) {
+    log('rx', 'C10A ' + hx(v));
+    this.rx = splitFrames(this.rx.concat(v.slice(2)), f => {
+      const r = parseFrame(f), p = this.pending;
+      if (p && r.pid === p.pid && r.cc === p.cc + 1 && uidStr(r.src) === uidStr(p.uid)) p.resolve(r);
+    });
+  },
+  onScan(v) {
+    log('rx', 'C10B ' + hx(v));
+    if (!this.scanCb) return;
+    if (v[0] === 0xC1 && v.length >= 7) this.scanCb.found(v.slice(1, 7));
+    else if (v[0] === 0xC2) this.scanCb.done();
+  },
+  async request(uid, cc, pid, data = []) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const frame = buildFrame(uid, cc, pid, data);
+      this.rx = [];
+      const r = await new Promise(resolve => {
+        const t = setTimeout(() => { this.pending = null; resolve(null); }, 1300);
+        this.pending = { uid, cc, pid, resolve: x => { clearTimeout(t); this.pending = null; resolve(x); } };
+        log('tx', 'C109 ' + hx(frame));
+        this.write(this.ch['109'], frame, true).catch(e => { log('er', e.message); this.pending?.resolve(null); });
+      });
+      if (r) return r;
+    }
+    return null;
+  },
+  async scan(known, onFound) {
+    const c = this.ch['10b'];
+    return new Promise(async resolve => {
+      let ended = false;
+      const end = () => { if (ended) return; ended = true; clearTimeout(safety); this.scanCb = null; resolve(); };
+      this.scanCb = { found: onFound, done: end };
+      const safety = setTimeout(async () => { log('er', 'Ricerca: tempo scaduto, la fermo'); try { await this.write(c, [0xA2, 0, 0, 0, 0], false); } catch {} end(); }, 30000);
+      try {
+        log('tx', 'C10B 01 00 00 00 00'); await this.write(c, [1, 0, 0, 0, 0], false); await sleep(160);
+        for (const u of known) { log('tx', 'C10B 02 ' + hx(u)); await this.write(c, [2, ...u], false); await sleep(30); }
+        log('tx', 'C10B A1 00 00 00 00'); await this.write(c, [0xA1, 0, 0, 0, 0], false);
+      } catch (e) { log('er', e.message); end(); }
+    });
+  },
+  async stopScan() { try { await this.write(this.ch['10b'], [0xA2, 0, 0, 0, 0], false); } catch {} this.scanCb?.done(); }
+};
+
+/* =====================================================================
+   Trasporto demo (fixture simulate, nessun Bluetooth)
+   ===================================================================== */
+function simFixture(o) { return Object.assign({ identify: 0, panInv: 0, tiltInv: 0, swap: 0, dispInv: 0, dispLevel: 200, lampState: 1, lampOnMode: 1, power: 0xFF, label: '' }, o); }
+const SIM = [
+  simFixture({ uid: [0x7F, 0xF0, 0, 0, 1, 0x11], man: 'Demo Lighting', model: 'Beam 280 Demo', label: 'SX 1', addr: 1, pers: 1,
+    modes: [[16, 'Standard'], [20, 'Extended'], [12, 'Compact']], hours: 1532, lamp: 412, sw: 'v2.4.1', modelId: 0x0210,
+    sensors: [['Temperatura testa', 1, 0, 46, 21, 58, 0, 70], ['Temperatura base', 1, 0, 38, 20, 41, 0, 60], ['Ventola testa (rpm)', 0, 0, 3100, 2900, 3300, 0, 5000]],
+    pids: [0x80, 0x81, 0x82, 0xE0, 0xE1, 0x200, 0x201, 0x400, 0x401, 0x403, 0x404, 0x500, 0x501, 0x600, 0x601, 0x602, 0x1001, 0x1010, 0x90] }),
+  simFixture({ uid: [0x7F, 0xF0, 0, 0, 1, 0x12], man: 'Demo Lighting', model: 'Beam 280 Demo', label: 'SX 2', addr: 17, pers: 1,
+    modes: [[16, 'Standard'], [20, 'Extended'], [12, 'Compact']], hours: 1498, lamp: 377, sw: 'v2.4.1', modelId: 0x0210,
+    sensors: [['Temperatura testa', 1, 0, 81, 22, 84, 0, 70], ['Temperatura base', 1, 0, 42, 20, 45, 0, 60]],
+    pids: [0x80, 0x81, 0x82, 0xE0, 0xE1, 0x200, 0x201, 0x400, 0x401, 0x403, 0x404, 0x500, 0x501, 0x600, 0x601, 0x602, 0x1001, 0x1010, 0x90] }),
+  simFixture({ uid: [0x7F, 0xF1, 0, 0, 2, 0x40], man: 'Demo Lighting', model: 'Wash 19x15 Demo', label: '', addr: 101, pers: 2,
+    modes: [[14, 'Basic'], [21, 'Standard'], [67, 'Pixel']], hours: 820, sw: 'v1.0.7', modelId: 0x0305,
+    sensors: [['Temperatura LED', 1, 0, 52, 24, 60, 0, 75]],
+    pids: [0x80, 0x81, 0x82, 0xE0, 0xE1, 0x200, 0x201, 0x400, 0x501, 0x600, 0x601, 0x1001, 0x90] }),
+  simFixture({ uid: [0x7F, 0xF2, 0, 0, 3, 0x07], man: 'Demo FX', model: 'Strobe Demo', label: 'Strobo palco', addr: 301, pers: 1,
+    modes: [[4, '4 canali']], sw: '1.3', modelId: 0x0101, sensors: [], pids: [0x80, 0x81, 0x82, 0xE0, 0xE1] })
+];
+const demoT = {
+  name: 'demo',
+  async connect() { await sleep(400); return 'DMXelf demo'; },
+  disconnect() { onDisconnected(); },
+  async scan(known, onFound) { for (const f of SIM) { await sleep(320); onFound(f.uid.slice()); } await sleep(200); },
+  async stopScan() {},
+  async request(uid, cc, pid, data = []) {
+    await sleep(45);
+    const f = SIM.find(x => uidStr(x.uid) === uidStr(uid)); if (!f) return null;
+    log('tx', 'DEMO ' + hx(buildFrame(uid, cc, pid, data)));
+    const ack = pd => ({ src: f.uid, rtype: 0, cc: cc + 1, pid, pd });
+    const nack = code => ({ src: f.uid, rtype: 2, cc: cc + 1, pid, pd: u16(code) });
+    if (!REQUIRED.has(pid) && pid !== P.SUPPORTED_PARAMETERS && !f.pids.includes(pid)) return nack(0);
+    const mode = f.modes[f.pers - 1];
+    if (cc === CC.GET) switch (pid) {
+      case P.SUPPORTED_PARAMETERS: return ack(f.pids.flatMap(u16));
+      case P.DEVICE_INFO: return ack([1, 0, ...u16(f.modelId), ...u16(0x0101), ...u32(0x020401), ...u16(mode[0]), f.pers, f.modes.length, ...u16(f.addr), 0, 0, f.sensors.length]);
+      case P.SOFTWARE_VERSION_LABEL: return ack(bytes(f.sw));
+      case P.MANUFACTURER_LABEL: return ack(bytes(f.man));
+      case P.DEVICE_MODEL_DESCRIPTION: return ack(bytes(f.model));
+      case P.DEVICE_LABEL: return ack(bytes(f.label));
+      case P.DMX_START_ADDRESS: return ack(u16(f.addr));
+      case P.DMX_PERSONALITY: return ack([f.pers, f.modes.length]);
+      case P.DMX_PERSONALITY_DESCRIPTION: { const m = f.modes[data[0] - 1]; return m ? ack([data[0], ...u16(m[0]), ...bytes(m[1])]) : nack(6); }
+      case P.DEVICE_HOURS: return ack(u32(f.hours));
+      case P.LAMP_HOURS: return ack(u32(f.lamp));
+      case P.LAMP_STATE: return ack([f.lampState]);
+      case P.LAMP_ON_MODE: return ack([f.lampOnMode]);
+      case P.POWER_STATE: return ack([f.power]);
+      case P.DISPLAY_INVERT: return ack([f.dispInv]);
+      case P.DISPLAY_LEVEL: return ack([f.dispLevel]);
+      case P.PAN_INVERT: return ack([f.panInv]);
+      case P.TILT_INVERT: return ack([f.tiltInv]);
+      case P.PAN_TILT_SWAP: return ack([f.swap]);
+      case P.IDENTIFY_DEVICE: return ack([f.identify]);
+      case P.SENSOR_DEFINITION: { const s = f.sensors[data[0]]; return s ? ack([data[0], 0, s[1], s[2], ...u16(0), ...u16(Math.max(200, s[7] * 1.4 | 0)), ...u16(s[6]), ...u16(s[7]), 3, ...bytes(s[0])]) : nack(6); }
+      case P.SENSOR_VALUE: { const s = f.sensors[data[0]]; if (!s) return nack(6); const jit = Math.round((Math.random() - .5) * 2); return ack([data[0], ...u16(s[3] + jit), ...u16(s[4]), ...u16(s[5]), ...u16(0)]); }
+    }
+    if (cc === CC.SET) {
+      const v = data[0];
+      switch (pid) {
+        case P.DMX_START_ADDRESS: f.addr = rd16(data, 0); return ack([]);
+        case P.DMX_PERSONALITY: f.pers = v; return ack([]);
+        case P.DEVICE_LABEL: f.label = str(data); return ack([]);
+        case P.IDENTIFY_DEVICE: f.identify = v; return ack([]);
+        case P.PAN_INVERT: f.panInv = v; return ack([]);
+        case P.TILT_INVERT: f.tiltInv = v; return ack([]);
+        case P.PAN_TILT_SWAP: f.swap = v; return ack([]);
+        case P.DISPLAY_INVERT: f.dispInv = v; return ack([]);
+        case P.DISPLAY_LEVEL: f.dispLevel = v; return ack([]);
+        case P.LAMP_STATE: f.lampState = v; return ack([]);
+        case P.LAMP_ON_MODE: f.lampOnMode = v; return ack([]);
+        case P.POWER_STATE: f.power = v; return ack([]);
+        case P.RESET_DEVICE: case P.FACTORY_DEFAULTS: return ack([]);
+      }
+    }
+    return nack(5);
+  }
+};
+
+/* =====================================================================
+   Livello RDM comune
+   ===================================================================== */
+let T = null;            // trasporto attivo
+const drafts = {};       // valori digitati non ancora applicati (sopravvivono ai re-render)
+const clearDrafts = () => { for (const k in drafts) delete drafts[k]; };
+let chain = Promise.resolve();
+function rdm(uid, cc, pid, data = []) {
+  const p = chain.then(async () => {
+    if (!T) return { status: 'offline' };
+    const r = await T.request(uid, cc, pid, data);
+    if (!r) return { status: 'timeout' };
+    if (r.rtype === 0 || r.rtype === 3) return { status: 'ack', pd: r.pd, overflow: r.rtype === 3 };
+    if (r.rtype === 2) { const code = rd16(r.pd, 0); log('er', `NACK PID 0x${pid.toString(16).padStart(4, '0')}: ${NACK[code] || code}`); return { status: 'nack', code }; }
+    return { status: 'timer' };
+  });
+  chain = p.catch(() => {});
+  return p;
+}
+const get = (f, pid, data) => rdm(f.uid, CC.GET, pid, data);
+const set = (f, pid, data) => rdm(f.uid, CC.SET, pid, data);
+
+function decodeInfo(pd) {
+  return { protocol: `${pd[0]}.${pd[1]}`, modelId: rd16(pd, 2), category: rd16(pd, 4), swId: rd32(pd, 6), footprint: rd16(pd, 10),
+    personality: pd[12], personalityCount: pd[13], address: rd16(pd, 14), subDevices: rd16(pd, 16), sensorCount: pd[18] };
+}
+
+/* =====================================================================
+   Stato applicazione
+   ===================================================================== */
+const S = {
+  view: 'list', connected: false, connecting: false, deviceName: '', battery: null, fw: '',
+  scanning: false, fixtures: new Map(), current: null, loadingDetail: false, confirm: null
+};
+(function loadSaved() {
+  for (const o of store.get('dmxelf.fixtures', [])) S.fixtures.set(o.uidStr, Object.assign(o, { found: false, identify: false }));
+})();
+function save() {
+  const keep = ['uid', 'uidStr', 'label', 'model', 'manufacturer', 'address', 'footprint', 'personality', 'personalityCount', 'modeName'];
+  store.set('dmxelf.fixtures', [...S.fixtures.values()].map(f => Object.fromEntries(keep.map(k => [k, f[k]]))));
+}
+function fixtureFor(uid) {
+  const k = uidStr(uid);
+  if (!S.fixtures.has(k)) S.fixtures.set(k, { uid: Array.from(uid), uidStr: k, label: '', model: '', manufacturer: '', address: null });
+  return S.fixtures.get(k);
+}
+function onStatus(v) {
+  if (v.length > 3) S.battery = v[0];
+  if (v[1]) S.fw = [v[1], ...[v[2], v[3], v[4]].filter(x => x).map(x => String(x).padStart(2, '0'))].join('.');
+  render();
+}
+function onDisconnected() {
+  const was = S.connected;
+  S.connected = false; S.scanning = false; T = null;
+  for (const f of S.fixtures.values()) { f.found = false; f.identify = false; }
+  if (was) toast('DMXelf scollegato');
+  render();
+}
+
+/* ---------- azioni ---------- */
+async function connect(demo) {
+  if (S.connecting) return;
+  S.connecting = true; render();
+  try {
+    T = demo ? demoT : bleT;
+    S.deviceName = await T.connect();
+    S.connected = true;
+    if (demo) { S.battery = 86; S.fw = '1.0.3'; }
+    toast(demo ? 'Modalità demo attiva' : 'DMXelf collegato');
+    log('rx', 'Collegato a ' + S.deviceName);
+  } catch (e) {
+    T = null;
+    if (e && e.name !== 'NotFoundError') { toast(e.message || 'Collegamento non riuscito'); log('er', e.message || String(e)); }
+  }
+  S.connecting = false; render();
+}
+function disconnect() { const t = T; T = null; t?.disconnect(); onDisconnected(); }
+
+async function scan() {
+  if (!S.connected || S.scanning) return;
+  S.scanning = true;
+  for (const f of S.fixtures.values()) f.found = false;
+  render();
+  const known = [...S.fixtures.values()].map(f => f.uid);
+  const found = [];
+  await T.scan(known, uid => { const f = fixtureFor(uid); if (!f.found) found.push(f); f.found = true; log('rx', 'Trovata ' + f.uidStr); render(); });
+  S.scanning = false; render();
+  toast(found.length ? `${found.length} fixture trovate` : 'Nessuna fixture RDM trovata');
+  for (const f of found) await loadSummary(f);
+  save(); render();
+}
+async function loadSummary(f) {
+  const info = await get(f, P.DEVICE_INFO);
+  if (info.status === 'ack') {
+    const d = decodeInfo(info.pd);
+    Object.assign(f, { info: d, address: d.address, footprint: d.footprint, personality: d.personality, personalityCount: d.personalityCount });
+  } else {
+    const a = await get(f, P.DMX_START_ADDRESS); if (a.status === 'ack') f.address = rd16(a.pd, 0);
+  }
+  const l = await get(f, P.DEVICE_LABEL); if (l.status === 'ack') f.label = str(l.pd);
+  const m = await get(f, P.DEVICE_MODEL_DESCRIPTION); if (m.status === 'ack') f.model = str(m.pd);
+  const mf = await get(f, P.MANUFACTURER_LABEL); if (mf.status === 'ack') f.manufacturer = str(mf.pd);
+  render();
+}
+async function toggleIdentify(f) {
+  const on = !f.identify;
+  f.identify = on; render();
+  const r = await set(f, P.IDENTIFY_DEVICE, [on ? 1 : 0]);
+  if (r.status !== 'ack') { f.identify = !on; toast(r.status === 'nack' ? (NACK[r.code] || 'Identify rifiutato') : 'La fixture non risponde'); }
+  render();
+}
+
+/* ---------- scheda RDM ---------- */
+const supports = (f, pid) => !(f.nack && f.nack.has(pid)) && (REQUIRED.has(pid) || !f.supported || f.supported.has(pid));
+async function getInto(f, pid, data, apply) {
+  if (!supports(f, pid)) return;
+  const r = await get(f, pid, data);
+  if (r.status === 'ack') apply(r.pd);
+  else if (r.status === 'nack' && (r.code === 0 || r.code === 5)) { f.nack = f.nack || new Set(); f.nack.add(pid); }
+}
+async function openDetail(f) {
+  S.current = f; S.view = 'detail'; S.confirm = null; f.v = f.v || {}; clearDrafts();
+  render(); window.scrollTo(0, 0);
+  if (!S.connected) return;
+  S.loadingDetail = true; render();
+  // parametri supportati (con eventuali pagine ACK_OVERFLOW)
+  let list = [], tries = 0, r;
+  do { r = await get(f, P.SUPPORTED_PARAMETERS); if (r.status === 'ack') for (let i = 0; i + 1 < r.pd.length; i += 2) list.push(rd16(r.pd, i)); }
+  while (r.status === 'ack' && r.overflow && ++tries < 6);
+  f.supported = r.status === 'ack' ? new Set(list) : null;
+  if (S.current !== f) return;
+  await getInto(f, P.DEVICE_INFO, [], pd => { f.info = decodeInfo(pd); Object.assign(f, { address: f.info.address, footprint: f.info.footprint, personality: f.info.personality, personalityCount: f.info.personalityCount }); });
+  render();
+  await getInto(f, P.DEVICE_LABEL, [], pd => f.label = str(pd));
+  await getInto(f, P.DEVICE_MODEL_DESCRIPTION, [], pd => f.model = str(pd));
+  await getInto(f, P.MANUFACTURER_LABEL, [], pd => f.manufacturer = str(pd));
+  await getInto(f, P.SOFTWARE_VERSION_LABEL, [], pd => f.v.sw = str(pd));
+  render();
+  if (f.personalityCount) {
+    f.personalities = [];
+    for (let n = 1; n <= f.personalityCount; n++)
+      await getInto(f, P.DMX_PERSONALITY_DESCRIPTION, [n], pd => f.personalities.push({ n: pd[0], ch: rd16(pd, 1), name: str(pd.slice(3)) }));
+    const cur = f.personalities.find(p => p.n === f.personality); if (cur) f.modeName = cur.name;
+    render();
+  }
+  await getInto(f, P.DEVICE_HOURS, [], pd => f.v.hours = rd32(pd, 0));
+  await getInto(f, P.LAMP_HOURS, [], pd => f.v.lampHours = rd32(pd, 0));
+  await getInto(f, P.LAMP_STATE, [], pd => f.v.lampState = pd[0]);
+  await getInto(f, P.LAMP_ON_MODE, [], pd => f.v.lampOnMode = pd[0]);
+  await getInto(f, P.POWER_STATE, [], pd => f.v.power = pd[0]);
+  render();
+  await loadSensors(f, true);
+  await getInto(f, P.PAN_INVERT, [], pd => f.v.panInv = pd[0]);
+  await getInto(f, P.TILT_INVERT, [], pd => f.v.tiltInv = pd[0]);
+  await getInto(f, P.PAN_TILT_SWAP, [], pd => f.v.swap = pd[0]);
+  await getInto(f, P.DISPLAY_INVERT, [], pd => f.v.dispInv = pd[0]);
+  await getInto(f, P.DISPLAY_LEVEL, [], pd => f.v.dispLevel = pd[0]);
+  S.loadingDetail = false; save(); render();
+}
+async function loadSensors(f, withDefs) {
+  const n = f.info?.sensorCount || 0;
+  if (!n || !supports(f, P.SENSOR_VALUE)) return;
+  if (withDefs || !f.sensors) {
+    f.sensors = [];
+    for (let i = 0; i < n; i++) await getInto(f, P.SENSOR_DEFINITION, [i], pd => f.sensors[i] = {
+      type: pd[1], unit: pd[2], prefix: pd[3], rangeMin: rs16(pd, 4), rangeMax: rs16(pd, 6), normalMin: rs16(pd, 8), normalMax: rs16(pd, 10), name: str(pd.slice(13)) || `Sensore ${i + 1}` });
+  }
+  for (let i = 0; i < n; i++) await getInto(f, P.SENSOR_VALUE, [i], pd => {
+    f.sensors[i] = f.sensors[i] || { name: `Sensore ${i + 1}`, unit: 0, prefix: 0 };
+    Object.assign(f.sensors[i], { value: rs16(pd, 1), low: rs16(pd, 3), high: rs16(pd, 5) });
+  });
+  render();
+}
+async function apply(f, pid, data, okMsg, after) {
+  const r = await set(f, pid, data);
+  if (r.status === 'ack') { toast(okMsg); if (after) await after(); }
+  else toast(r.status === 'nack' ? (NACK[r.code] || 'Comando rifiutato') : 'La fixture non risponde');
+  save(); render();
+  return r.status === 'ack';
+}
+
+/* =====================================================================
+   Render
+   ===================================================================== */
+const ico = {
+  back: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  chev: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  ble: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 7l10 10-5 4V3l5 4L7 17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  scan: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+};
+const spin = '<span class="spin" aria-hidden="true"></span>';
+const fxTitle = f => f.label || f.model || 'Fixture RDM';
+const fxRange = f => f.address ? (f.footprint ? `${pad3(f.address)}–${pad3(f.address + f.footprint - 1)}` : pad3(f.address)) : '—';
+
+function render() {
+  const pill = $('#conn-pill');
+  pill.className = 'pill' + (S.connected ? (T?.name === 'demo' ? ' demo' : ' on') : '');
+  $('#conn-text').textContent = S.connected ? (T?.name === 'demo' ? 'Demo' : 'Collegato') : (S.connecting ? 'Collego…' : 'Non collegato');
+  const app = $('#app');
+  const focusId = document.activeElement?.id, selStart = document.activeElement?.selectionStart;
+  app.innerHTML = S.view === 'detail' && S.current ? detailView(S.current) : listView();
+  for (const [id, val] of Object.entries(drafts)) { const el = document.getElementById(id); if (el && !el.disabled) el.value = val; }
+  if (focusId) { const el = document.getElementById(focusId); if (el) { el.focus(); try { if (selStart != null) el.setSelectionRange(selStart, selStart); } catch {} } }
+}
+
+function deviceCard() {
+  const hasBT = !!navigator.bluetooth;
+  if (!S.connected) return `
+  <section class="device" aria-label="DMXelf">
+    <div class="device-head">
+      <div class="device-ico">${ico.ble}</div>
+      <div class="device-text">
+        <div class="device-name">DMXelf non collegato</div>
+        <div class="device-sub">${hasBT ? 'Accendi il DMXelf e chiudi l\'app ufficiale prima di collegarti.' : 'Questo browser non supporta il Bluetooth. Su iPhone apri la pagina con Bluefy.'}</div>
+      </div>
+    </div>
+    <div class="actions-grid">
+      <button class="btn primary" id="btn-connect" type="button" ${!hasBT || S.connecting ? 'disabled' : ''}>${S.connecting ? spin + ' Collego…' : 'Collega DMXelf'}</button>
+      <button class="btn" id="btn-demo" type="button" ${S.connecting ? 'disabled' : ''}>Prova in demo</button>
+    </div>
+  </section>`;
+  return `
+  <section class="device" aria-label="DMXelf">
+    <div class="device-head">
+      <div class="device-ico">${ico.ble}</div>
+      <div class="device-text">
+        <div class="device-name">${esc(S.deviceName)}</div>
+        <div class="device-meta">
+          ${S.battery != null ? `<span class="chip ${S.battery < 20 ? 'muted' : ''} num">Batteria ${S.battery}%</span>` : ''}
+          ${S.fw ? `<span class="chip muted num">FW ${esc(S.fw)}</span>` : ''}
+          ${T?.name === 'demo' ? '<span class="chip muted">Fixture simulate</span>' : ''}
+        </div>
+      </div>
+      <button class="btn ghost" id="btn-disconnect" type="button">Scollega</button>
+    </div>
+  </section>`;
+}
+
+function fixtureCard(f) {
+  const off = S.connected && !f.found && !S.scanning;
+  const mode = f.personality ? `Modo ${f.personality}/${f.personalityCount || '?'}${f.footprint ? ` · ${f.footprint} ch` : ''}` : '';
+  return `
+  <article class="fx ${f.identify ? 'is-ident' : ''} ${off || !S.connected ? 'offline' : ''}" data-uid="${f.uidStr}">
+    <div class="fx-top">
+      <div class="fx-addr num"><span>DMX</span><b>${f.address ? pad3(f.address) : '—'}</b></div>
+      <div class="fx-text">
+        <div class="fx-brand">${esc(f.manufacturer || 'Produttore sconosciuto')}</div>
+        <div class="fx-name">${esc(fxTitle(f))}</div>
+        <div class="fx-meta">
+          ${f.label && f.model ? `<span class="chip muted">${esc(f.model)}</span>` : ''}
+          ${mode ? `<span class="chip num">${esc(mode)}</span>` : ''}
+          <span class="chip muted mono">${f.uidStr}</span>
+          ${off ? '<span class="chip muted">Non trovata</span>' : ''}
+        </div>
+      </div>
+    </div>
+    <div class="fx-actions">
+      <button class="btn ident-btn" type="button" data-act="ident" aria-pressed="${!!f.identify}" ${!S.connected || off ? 'disabled' : ''}><span class="bulb"></span>${f.identify ? 'Identify ON' : 'Identify'}</button>
+      <button class="btn primary" type="button" data-act="rdm" ${!S.connected || off ? 'disabled' : ''}>RDM ${ico.chev}</button>
+    </div>
+  </article>`;
+}
+
+function listView() {
+  const all = [...S.fixtures.values()].sort((a, b) => ((!!b.found) - (!!a.found)) || ((a.address || 999) - (b.address || 999)));
+  const shown = all;
+  const foundN = all.filter(f => f.found).length;
+  return `
+  ${deviceCard()}
+  <section aria-labelledby="fx-title" style="display:grid;gap:12px">
+    <div class="sec-head">
+      <div>
+        <p class="sec-title">Linea DMX</p>
+        <h2 class="page-title" id="fx-title">Fixture <span class="num" style="color:var(--muted);font-weight:500">${S.connected ? foundN : all.length}</span></h2>
+      </div>
+      <button class="btn ${S.scanning ? '' : 'primary'}" id="btn-scan" type="button" ${!S.connected ? 'disabled' : ''}>${S.scanning ? spin + ' Ferma' : ico.scan + ' Scansiona'}</button>
+    </div>
+    ${shown.length ? `<div class="list">${shown.map(fixtureCard).join('')}</div>` : `
+    <div class="empty">
+      <b>${S.scanning ? 'Ricerca in corso…' : 'Nessuna fixture'}</b>
+      <span>${S.connected ? 'Collega il DMXelf all\'ingresso DMX della prima fixture e premi Scansiona.' : 'Collega il DMXelf per cercare le fixture RDM sulla linea.'}</span>
+    </div>`}
+  </section>`;
+}
+
+function row(k, v, cls = '') { return `<div class="row"><dt>${k}</dt><dd class="${cls}">${v}</dd></div>`; }
+const dash = '<span class="v-muted">—</span>';
+
+function detailView(f) {
+  const v = f.v || {}, info = f.info || {};
+  const can = pid => S.connected && supports(f, pid);
+  const pers = f.personalities || [];
+  const sec = [];
+
+  // DMX
+  sec.push(`
+  <section class="panel" aria-labelledby="h-dmx">
+    <div class="panel-head"><p class="sec-title" id="h-dmx">Indirizzo e modo</p><span class="chip num">${esc(fxRange(f))}</span></div>
+    <div class="panel-body">
+      <div class="field">
+        <label for="in-addr">Indirizzo DMX</label>
+        <div class="inline">
+          <button class="btn step" type="button" data-act="addr-dec" aria-label="Indirizzo meno uno">−</button>
+          <input class="input addr grow" id="in-addr" type="number" inputmode="numeric" min="1" max="512" value="${f.address || ''}" ${!S.connected ? 'disabled' : ''}>
+          <button class="btn step" type="button" data-act="addr-inc" aria-label="Indirizzo più uno">+</button>
+          <button class="btn primary" type="button" data-act="addr-set" ${!S.connected ? 'disabled' : ''}>Applica</button>
+        </div>
+        ${f.footprint && f.address ? `<span class="hint num">Occupa i canali ${fxRange(f)} (${f.footprint} ch)${f.address + f.footprint - 1 > 512 ? ' — supera il canale 512!' : ''}</span>` : ''}
+      </div>
+      ${f.personalityCount ? `
+      <div class="field">
+        <label for="in-mode">Modo DMX</label>
+        <div class="inline">
+          <select class="select grow" id="in-mode" ${!can(P.DMX_PERSONALITY) ? 'disabled' : ''}>
+            ${pers.length ? pers.map(p => `<option value="${p.n}" ${p.n === f.personality ? 'selected' : ''}>${p.n} · ${esc(p.name)} (${p.ch} ch)</option>`).join('')
+              : Array.from({ length: f.personalityCount }, (_, i) => `<option value="${i + 1}" ${i + 1 === f.personality ? 'selected' : ''}>Modo ${i + 1}</option>`).join('')}
+          </select>
+          <button class="btn primary" type="button" data-act="mode-set" ${!can(P.DMX_PERSONALITY) ? 'disabled' : ''}>Applica</button>
+        </div>
+      </div>` : ''}
+    </div>
+  </section>`);
+
+  // Stato
+  const hasHours = v.hours != null || v.lampHours != null;
+  const sensors = (f.sensors || []).filter(Boolean);
+  if (hasHours || sensors.length || v.lampState != null || v.power != null) {
+    sec.push(`
+  <section class="panel" aria-labelledby="h-state">
+    <div class="panel-head"><p class="sec-title" id="h-state">Stato</p>${sensors.length ? `<button class="btn ghost" type="button" data-act="sens-refresh" style="min-height:34px;padding:0 10px">${ico.scan} Aggiorna</button>` : ''}</div>
+    <div class="panel-body">
+      ${hasHours ? `<div class="stats">
+        ${v.hours != null ? `<div class="stat"><span class="k">Ore fixture</span><span class="v">${fmtInt(v.hours)}<small>h</small></span></div>` : ''}
+        ${v.lampHours != null ? `<div class="stat"><span class="k">Ore lampada</span><span class="v">${fmtInt(v.lampHours)}<small>h</small></span></div>` : ''}
+      </div>` : ''}
+      ${sensors.length ? `<div>${sensors.map(sensorRow).join('')}</div>` : ''}
+      ${v.lampState != null || v.power != null ? `<dl class="rows">
+        ${v.lampState != null ? row('Lampada', esc(LAMP_STATE[v.lampState] ?? `0x${v.lampState.toString(16)}`)) : ''}
+        ${v.power != null ? row('Alimentazione', esc(POWER_STATE[v.power] ?? `0x${v.power.toString(16)}`)) : ''}
+      </dl>` : ''}
+    </div>
+  </section>`);
+  }
+
+  // Impostazioni
+  const sets = [];
+  const sw = (key, pid, label) => v[key] != null ? `<div class="row"><span class="k">${label}</span><button class="switch" type="button" role="switch" aria-label="${label}" aria-checked="${!!v[key]}" data-act="toggle" data-key="${key}" data-pid="${pid}" ${!S.connected ? 'disabled' : ''}></button></div>` : '';
+  const motion = sw('panInv', P.PAN_INVERT, 'Pan invertito') + sw('tiltInv', P.TILT_INVERT, 'Tilt invertito') + sw('swap', P.PAN_TILT_SWAP, 'Scambia Pan/Tilt');
+  if (motion) sets.push(`<div class="rows">${motion}</div>`);
+  if (v.dispInv != null || v.dispLevel != null) sets.push(`
+      ${v.dispInv != null ? `<div class="field"><span class="lbl">Display capovolto</span><div class="seg" role="group" aria-label="Display capovolto">
+        ${[[0, 'Off'], [1, 'On'], [2, 'Auto']].map(([n, t]) => `<button type="button" data-act="seg" data-key="dispInv" data-pid="${P.DISPLAY_INVERT}" data-val="${n}" aria-pressed="${v.dispInv === n}">${t}</button>`).join('')}
+      </div></div>` : ''}
+      ${v.dispLevel != null ? `<div class="field"><label for="in-disp">Luminosità display <span class="num" id="disp-pct">${Math.round(v.dispLevel / 2.55)}%</span></label>
+        <input class="range" id="in-disp" type="range" min="0" max="255" value="${v.dispLevel}" ${!S.connected ? 'disabled' : ''}></div>` : ''}`);
+  if (v.lampState != null && supports(f, P.LAMP_STATE)) sets.push(`
+      <div class="field"><span class="lbl">Lampada</span><div class="seg" role="group" aria-label="Stato lampada">
+        ${[[0, 'Off'], [1, 'On'], [3, 'Standby']].map(([n, t]) => `<button type="button" data-act="seg" data-key="lampState" data-pid="${P.LAMP_STATE}" data-val="${n}" aria-pressed="${v.lampState === n}">${t}</button>`).join('')}
+      </div></div>`);
+  if (v.lampOnMode != null) sets.push(selField('in-lom', 'Accensione lampada', LAMP_ON_MODE, v.lampOnMode, 'lampOnMode', P.LAMP_ON_MODE));
+  if (v.power != null) sets.push(selField('in-pow', 'Stato alimentazione', POWER_STATE, v.power, 'power', P.POWER_STATE));
+  if (sets.length) sec.push(`
+  <section class="panel" aria-labelledby="h-set">
+    <div class="panel-head"><p class="sec-title" id="h-set">Impostazioni</p></div>
+    <div class="panel-body">${sets.join('')}</div>
+  </section>`);
+
+  // Info
+  sec.push(`
+  <section class="panel" aria-labelledby="h-info">
+    <div class="panel-head"><p class="sec-title" id="h-info">Informazioni</p></div>
+    <div class="panel-body">
+      <div class="field">
+        <label for="in-label">Nome fixture (Device label)</label>
+        <div class="inline">
+          <input class="input grow" id="in-label" type="text" maxlength="32" value="${esc(f.label)}" placeholder="Es. SX 1" ${!can(P.DEVICE_LABEL) ? 'disabled' : ''}>
+          <button class="btn primary" type="button" data-act="label-set" ${!can(P.DEVICE_LABEL) ? 'disabled' : ''}>Salva</button>
+        </div>
+      </div>
+      <dl class="rows">
+        ${row('Produttore', f.manufacturer ? esc(f.manufacturer) : dash)}
+        ${row('Modello', f.model ? esc(f.model) : dash)}
+        ${row('Software', v.sw ? esc(v.sw) : dash)}
+        ${row('UID', `<span class="mono">${f.uidStr}</span>`)}
+        ${info.modelId != null ? row('Model ID', `<span class="mono">0x${info.modelId.toString(16).toUpperCase().padStart(4, '0')}</span>`) : ''}
+        ${info.protocol ? row('Protocollo RDM', `<span class="num">${info.protocol}</span>`) : ''}
+        ${info.subDevices ? row('Sub-device', `<span class="num">${info.subDevices}</span>`) : ''}
+        ${f.supported ? row('Parametri opzionali', `<span class="num">${f.supported.size}</span>`) : ''}
+      </dl>
+    </div>
+  </section>`);
+
+  // Azioni
+  const canReset = can(P.RESET_DEVICE), canFactory = can(P.FACTORY_DEFAULTS);
+  if (S.connected && (canReset || canFactory)) {
+    const c = S.confirm;
+    const confirmText = { warm: 'Riavvio "warm" della fixture: si riavvia il software senza togliere alimentazione.', cold: 'Riavvio completo della fixture, come spegnere e riaccendere.', factory: 'Ripristina le impostazioni di fabbrica: indirizzo, modo e settaggi tornano ai valori originali.' };
+    sec.push(`
+  <section class="panel" aria-labelledby="h-act">
+    <div class="panel-head"><p class="sec-title" id="h-act">Azioni</p></div>
+    <div class="panel-body">
+      ${c ? `<div class="confirm"><p>${confirmText[c]}</p><div class="inline">
+        <button class="btn" type="button" data-act="confirm-no">Annulla</button>
+        <button class="btn danger solid" type="button" data-act="confirm-yes">Conferma</button></div></div>` : `
+      <div class="actions-grid">
+        ${canReset ? '<button class="btn" type="button" data-act="ask" data-what="warm">Reset warm</button><button class="btn" type="button" data-act="ask" data-what="cold">Reset cold</button>' : ''}
+        ${canFactory ? '<button class="btn danger" type="button" data-act="ask" data-what="factory" style="grid-column:1/-1">Impostazioni di fabbrica</button>' : ''}
+      </div>`}
+    </div>
+  </section>`);
+  }
+
+  return `
+  <div class="detail-head">
+    <div><button class="btn ghost back" type="button" data-act="back">${ico.back} Fixture</button></div>
+    <div class="detail-title">
+      <div class="fx-text">
+        <div class="fx-brand">${esc(f.manufacturer || 'Fixture RDM')}</div>
+        <h1>${esc(fxTitle(f))}</h1>
+        <div class="fx-meta"><span class="chip num">DMX ${esc(fxRange(f))}</span>${f.modeName ? `<span class="chip muted">${esc(f.modeName)}</span>` : ''}</div>
+      </div>
+    </div>
+    <button class="btn ident-btn block" type="button" data-act="ident" aria-pressed="${!!f.identify}" ${!S.connected ? 'disabled' : ''}><span class="bulb"></span>${f.identify ? 'Identify ON · tocca per spegnere' : 'Identify'}</button>
+    ${S.loadingDetail ? `<div class="loading-line"><span class="spin"></span>Lettura parametri RDM…</div>` : ''}
+    ${!S.connected ? '<p class="note">DMXelf non collegato: dati dell\'ultima lettura.</p>' : ''}
+  </div>
+  ${sec.join('')}`;
+}
+
+function selField(id, label, map, cur, key, pid) {
+  return `<div class="field"><label for="${id}">${label}</label><div class="inline">
+    <select class="select grow" id="${id}" ${!S.connected ? 'disabled' : ''}>${Object.entries(map).map(([k, t]) => `<option value="${k}" ${Number(k) === cur ? 'selected' : ''}>${t}</option>`).join('')}</select>
+    <button class="btn primary" type="button" data-act="sel-set" data-sel="${id}" data-key="${key}" data-pid="${pid}" ${!S.connected ? 'disabled' : ''}>Applica</button></div></div>`;
+}
+function scaled(raw, prefix) { const e = PREFIX[prefix] ?? 0; const v = raw * Math.pow(10, e); return e < 0 ? v.toFixed(-e) : String(v); }
+function sensorRow(s) {
+  if (s.value == null) return `<div class="sensor"><div class="sensor-top"><span class="sensor-name">${esc(s.name)}</span><span class="sensor-val v-muted">—</span></div></div>`;
+  const u = UNITS[s.unit] ?? '';
+  const outside = s.normalMax > s.normalMin && (s.value > s.normalMax || s.value < s.normalMin);
+  const lo = s.rangeMin ?? 0, hi = s.rangeMax > lo ? s.rangeMax : Math.max(s.high || 0, s.value) * 1.2 || 1;
+  const pct = Math.max(0, Math.min(100, (s.value - lo) / (hi - lo) * 100));
+  return `<div class="sensor">
+    <div class="sensor-top"><span class="sensor-name">${esc(s.name)}</span><span class="sensor-val ${outside ? 'warn' : ''}">${scaled(s.value, s.prefix)} ${esc(u)}</span></div>
+    <div class="meter" aria-hidden="true"><i class="${outside ? 'warn' : ''}" style="width:${pct}%"></i></div>
+    <div class="sensor-sub"><span>min ${scaled(s.low, s.prefix)} · max ${scaled(s.high, s.prefix)} ${esc(u)}</span>${s.normalMax > s.normalMin ? `<span>normale ${scaled(s.normalMin, s.prefix)}–${scaled(s.normalMax, s.prefix)}</span>` : ''}</div>
+  </div>`;
+}
+
+/* =====================================================================
+   Eventi
+   ===================================================================== */
+document.addEventListener('click', async e => {
+  const b = e.target.closest('button'); if (!b || b.disabled) return;
+  if (b.id === 'theme') return toggleTheme();
+  if (b.id === 'btn-connect') return connect(false);
+  if (b.id === 'btn-demo') return connect(true);
+  if (b.id === 'btn-disconnect') return disconnect();
+  if (b.id === 'btn-scan') return S.scanning ? T?.stopScan() : scan();
+  const act = b.dataset.act; if (!act) return;
+  const card = b.closest('[data-uid]');
+  const f = card ? S.fixtures.get(card.dataset.uid) : S.current;
+  if (!f && act !== 'back') return;
+  switch (act) {
+    case 'ident': return toggleIdentify(f);
+    case 'rdm': return openDetail(f);
+    case 'back': S.view = 'list'; S.current = null; S.confirm = null; clearDrafts(); render(); return;
+    case 'addr-dec': case 'addr-inc': {
+      const inp = $('#in-addr'); const n = Math.min(512, Math.max(1, (parseInt(inp.value, 10) || 1) + (act === 'addr-inc' ? 1 : -1)));
+      inp.value = n; drafts['in-addr'] = String(n); return;
+    }
+    case 'addr-set': {
+      const n = parseInt($('#in-addr').value, 10);
+      if (!(n >= 1 && n <= 512)) return toast('Indirizzo valido: da 1 a 512');
+      return apply(f, P.DMX_START_ADDRESS, u16(n), `Indirizzo impostato a ${pad3(n)}`, async () => {
+        const r = await get(f, P.DMX_START_ADDRESS); f.address = r.status === 'ack' ? rd16(r.pd, 0) : n; delete drafts['in-addr'];
+      });
+    }
+    case 'mode-set': {
+      const n = parseInt($('#in-mode').value, 10);
+      return apply(f, P.DMX_PERSONALITY, [n], `Modo ${n} impostato`, async () => {
+        const r = await get(f, P.DEVICE_INFO);
+        if (r.status === 'ack') { f.info = decodeInfo(r.pd); Object.assign(f, { personality: f.info.personality, footprint: f.info.footprint, address: f.info.address }); }
+        else f.personality = n;
+        const p = (f.personalities || []).find(x => x.n === f.personality); f.modeName = p ? p.name : ''; delete drafts['in-mode'];
+      });
+    }
+    case 'label-set': {
+      const t = $('#in-label').value.slice(0, 32);
+      return apply(f, P.DEVICE_LABEL, bytes(t), 'Nome salvato', async () => { f.label = t; delete drafts['in-label']; });
+    }
+    case 'toggle': {
+      const key = b.dataset.key, pid = Number(b.dataset.pid), nv = f.v[key] ? 0 : 1;
+      return apply(f, pid, [nv], 'Impostazione applicata', async () => { f.v[key] = nv; });
+    }
+    case 'seg': {
+      const key = b.dataset.key, pid = Number(b.dataset.pid), nv = Number(b.dataset.val);
+      return apply(f, pid, [nv], 'Impostazione applicata', async () => { f.v[key] = nv; });
+    }
+    case 'sel-set': {
+      const key = b.dataset.key, pid = Number(b.dataset.pid), nv = Number($('#' + b.dataset.sel).value);
+      return apply(f, pid, [nv], 'Impostazione applicata', async () => { f.v[key] = nv; delete drafts[b.dataset.sel]; });
+    }
+    case 'sens-refresh': return loadSensors(f, false);
+    case 'ask': S.confirm = b.dataset.what; render(); return;
+    case 'confirm-no': S.confirm = null; render(); return;
+    case 'confirm-yes': {
+      const w = S.confirm; S.confirm = null; render();
+      if (w === 'factory') return apply(f, P.FACTORY_DEFAULTS, [], 'Impostazioni di fabbrica ripristinate');
+      return apply(f, P.RESET_DEVICE, [w === 'cold' ? 0xFF : 0x01], w === 'cold' ? 'Reset cold inviato' : 'Reset warm inviato');
+    }
+  }
+});
+document.addEventListener('input', e => {
+  if (e.target.id === 'in-addr' || e.target.id === 'in-label') drafts[e.target.id] = e.target.value;
+  if (e.target.id === 'in-disp') { const p = $('#disp-pct'); if (p) p.textContent = Math.round(e.target.value / 2.55) + '%'; }
+});
+document.addEventListener('change', e => {
+  if (e.target.tagName === 'SELECT') drafts[e.target.id] = e.target.value;
+  if (e.target.id === 'in-disp' && S.current) { const n = Number(e.target.value); apply(S.current, P.DISPLAY_LEVEL, [n], 'Luminosità display applicata', async () => { S.current.v.dispLevel = n; }); }
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.id === 'in-addr') document.querySelector('[data-act="addr-set"]')?.click();
+  if (e.key === 'Enter' && e.target.id === 'in-label') document.querySelector('[data-act="label-set"]')?.click();
+});
+
+/* tema (stessa logica del sito) */
+function toggleTheme() {
+  const root = document.documentElement;
+  const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  root.dataset.theme = dark ? 'light' : 'dark';
+  store.set('dmxelf.theme', root.dataset.theme);
+}
+(function initTheme() { const t = store.get('dmxelf.theme', null); if (t) document.documentElement.dataset.theme = t; })();
+
+render();
+</script>
