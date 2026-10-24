@@ -264,6 +264,53 @@ main { padding-block: 20px 24px; display: grid; gap: 22px; }
 .fd-ch { font-size: .66rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 @media (max-width: 340px) { .faders { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 
+/* DIP switch */
+.dip-display { display: grid; gap: 8px; }
+.dip-num {
+  width: 100%; height: 92px; text-align: center; font-size: 3.4rem; font-weight: 700; letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums; color: var(--text); background: var(--surface-2); border: 1px solid var(--border); border-radius: 14px;
+}
+.dip-num:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.dip-bar { height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.dip-bar i { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+.dip-on { display: flex; justify-content: space-between; font-size: .7rem; font-weight: 700; letter-spacing: .08em; color: var(--muted); }
+.dip-row { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 6px; }
+.sw { display: grid; gap: 6px; justify-items: center; }
+.sw button {
+  position: relative; width: 100%; height: 86px; padding: 0; border-radius: 10px; cursor: pointer;
+  background: var(--surface-2); border: 1px solid var(--border); transition: background var(--ease), border-color var(--ease);
+}
+.sw button::after {
+  content: ""; position: absolute; left: 4px; right: 4px; bottom: 4px; height: 44%; border-radius: 7px;
+  background: color-mix(in srgb, var(--muted) 45%, var(--surface)); transition: bottom var(--ease), background var(--ease);
+}
+.sw button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.sw button[aria-pressed="true"]::after { bottom: 52%; background: var(--accent); }
+.sw small { font-size: .74rem; font-weight: 650; color: var(--muted); font-variant-numeric: tabular-nums; }
+.sw .n { font-size: .66rem; color: var(--muted); }
+.dip-step { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center; }
+.dip-step .mid { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: .86rem; }
+.dip-step input { width: 64px; height: 44px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* Stepper e patch */
+.stepper { display: inline-flex; align-items: stretch; flex: none; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--surface); }
+.stepper button { width: 42px; border: 0; background: transparent; color: var(--accent); font-size: 1.25rem; cursor: pointer; }
+.stepper button:disabled { color: var(--muted); opacity: .5; }
+.stepper input { width: 58px; height: 42px; border: 0; border-inline: 1px solid var(--border); background: var(--surface); text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+.stepper input:focus { outline: none; background: var(--accent-soft); }
+.part { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.part .input { height: 42px; }
+.part .rm { width: 38px; height: 42px; min-height: 0; padding: 0; }
+.patch-sum { display: flex; flex-wrap: wrap; gap: 6px; }
+.prow { display: grid; grid-template-columns: 44px 52px minmax(0, 1fr); gap: 10px; align-items: baseline; padding: 10px 0; border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; }
+.prow:last-child { border-bottom: 0; }
+.prow .no { color: var(--muted); font-weight: 650; font-size: .86rem; }
+.prow .uni { font-weight: 700; color: var(--accent); }
+.prow .rng b { font-size: 1.05rem; }
+.prow .rng span { color: var(--muted); font-size: .86rem; }
+.prow .sub { grid-column: 3; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: .78rem; color: var(--muted); }
+.prow.uhead { grid-template-columns: 1fr; padding: 14px 0 6px; border-bottom: 0; }
+
 /* Registro */
 details.log { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
 details.log summary { cursor: pointer; padding: 12px 16px; font-size: .78rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); list-style: none; display: flex; justify-content: space-between; }
@@ -689,7 +736,10 @@ function decodeInfo(pd) {
    Stato applicazione
    ===================================================================== */
 const S = {
-  view: 'home', pct: false, connected: false, connecting: false, deviceName: '', battery: null, fw: '',
+  view: 'home', pct: false,
+  dip: store.get('dmxelf.dip', { addr: 1, step: 1 }),
+  patch: store.get('dmxelf.patch', { n: 8, start: 1, parts: [{ name: '', ch: 16 }], done: false }),
+  connected: false, connecting: false, deviceName: '', battery: null, fw: '',
   scanning: false, fixtures: new Map(), current: null, loadingDetail: false, confirm: null
 };
 (function loadSaved() {
@@ -954,7 +1004,8 @@ function render() {
   const focusId = document.activeElement?.id, selStart = document.activeElement?.selectionStart;
   app.innerHTML = S.view === 'detail' && S.current ? detailView(S.current)
     : S.view === 'faders' && S.current ? faderView(S.current)
-    : S.view === 'home' ? homeView() : listView(S.view === 'fc' ? 'fc' : 'rdm');
+    : S.view === 'home' ? homeView() : S.view === 'dip' ? dipView() : S.view === 'patch' ? patchView()
+    : listView(S.view === 'fc' ? 'fc' : 'rdm');
   for (const [id, val] of Object.entries(drafts)) { const el = document.getElementById(id); if (el && !el.disabled) el.value = val; }
   if (focusId) { const el = document.getElementById(focusId); if (el) { el.focus(); try { if (selStart != null) el.setSelectionRange(selStart, selStart); } catch {} } }
 }
@@ -1002,6 +1053,14 @@ function homeView() {
     <button class="tile" type="button" data-act="nav" data-to="fc">
       <span class="t-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 3v18M12 3v18M18 3v18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".45"/><rect x="3.5" y="12" width="5" height="3.5" rx="1" fill="currentColor"/><rect x="9.5" y="6" width="5" height="3.5" rx="1" fill="currentColor"/><rect x="15.5" y="15" width="5" height="3.5" rx="1" fill="currentColor"/></svg></span>
       <b>Fixture Control</b><span>Fader sui canali del modo attivo, letti dalla fixture via RDM</span>
+    </button>
+    <button class="tile" type="button" data-act="nav" data-to="dip">
+      <span class="t-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2" stroke="currentColor" stroke-width="1.8"/><rect x="6" y="9" width="2.6" height="3" rx=".6" fill="currentColor"/><rect x="10.7" y="12" width="2.6" height="3" rx=".6" fill="currentColor"/><rect x="15.4" y="9" width="2.6" height="3" rx=".6" fill="currentColor"/></svg></span>
+      <b>DIP Switch</b><span>Da indirizzo a switch e viceversa, anche senza DMXelf</span>
+    </button>
+    <button class="tile" type="button" data-act="nav" data-to="patch">
+      <span class="t-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h2M4 12h2M4 18h2M9 6h11M9 12h11M9 18h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>
+      <b>Patch</b><span>Indirizzi di una serie di fixture, con universi e subfixture</span>
     </button>
   </section>`;
 }
@@ -1198,6 +1257,118 @@ function detailView(f) {
   ${sec.join('')}`;
 }
 
+/* ---------- DIP switch ---------- */
+const WEIGHTS = [1, 2, 4, 8, 16, 32, 64, 128, 256];
+function dipView() {
+  const a = S.dip.addr;
+  return `
+  <div><button class="btn ghost back" type="button" data-act="nav" data-to="home">${ico.back} Home</button></div>
+  <section class="panel" aria-label="DIP switch">
+    <div class="panel-head"><p class="sec-title">DIP switch</p><button class="btn ghost" type="button" data-act="dip-reset" style="min-height:34px;padding:0 10px">Azzera</button></div>
+    <div class="panel-body">
+      <div class="dip-display">
+        <label for="dip-addr" class="hint">Indirizzo DMX (1–511 con 9 switch)</label>
+        <input class="dip-num" id="dip-addr" type="text" inputmode="numeric" value="${a}" autocomplete="off">
+        <div class="dip-bar" aria-hidden="true"><i style="width:${(a / 511 * 100).toFixed(1)}%"></i></div>
+      </div>
+      <div class="dip-on"><span>ON ↑</span><span>${a === 0 ? 'Indirizzo 0 non valido' : `Switch ON: ${WEIGHTS.map((w, i) => a & w ? i + 1 : 0).filter(Boolean).join(' · ') || '—'}`}</span></div>
+      <div class="dip-row">
+        ${WEIGHTS.map((w, i) => `<div class="sw"><span class="n">${i + 1}</span>
+          <button type="button" data-act="dip-sw" data-w="${w}" aria-pressed="${!!(a & w)}" aria-label="Switch ${i + 1} (valore ${w})"></button>
+          <small>${w}</small></div>`).join('')}
+      </div>
+      <div class="dip-step">
+        <button class="btn" type="button" data-act="dip-move" data-d="-1" aria-label="Indirizzo precedente">${ico.back}</button>
+        <div class="mid"><label for="dip-stepv">Step</label><input class="input" id="dip-stepv" type="text" inputmode="numeric" value="${S.dip.step}"></div>
+        <button class="btn primary" type="button" data-act="dip-move" data-d="1" aria-label="Indirizzo successivo">${ico.chev}</button>
+      </div>
+      <p class="note">Con Step uguale ai canali della fixture, le frecce ti danno l'indirizzo della fixture successiva.</p>
+    </div>
+  </section>`;
+}
+function setDip(addr) { S.dip.addr = Math.max(0, Math.min(511, addr | 0)); store.set('dmxelf.dip', S.dip); render(); }
+
+/* ---------- Patch ---------- */
+const clampInt = (v, lo, hi) => Math.max(lo, Math.min(hi, parseInt(v, 10) || lo));
+function patchTotal() { return S.patch.parts.reduce((t, p) => t + p.ch, 0); }
+function computePatch() {
+  const P2 = S.patch, tot = patchTotal(), out = [];
+  if (tot < 1 || tot > 512) return { error: 'I canali per fixture devono essere tra 1 e 512.' };
+  let u = 1, a = P2.start;
+  for (let i = 1; i <= P2.n; i++) {
+    if (a + tot - 1 > 512) { u++; a = 1; }
+    let pa = a;
+    const parts = P2.parts.map((p, k) => { const r = { name: p.name || (k === 0 ? 'Fixture' : `Sub ${k + 1}`), from: pa, to: pa + p.ch - 1 }; pa += p.ch; return r; });
+    out.push({ i, u, from: a, to: a + tot - 1, parts });
+    a += tot; if (a > 512) { u++; a = 1; }
+  }
+  return { rows: out, tot };
+}
+function stepper(id, field, value, lo, hi) {
+  return `<div class="stepper">
+    <button type="button" data-act="pstep" data-field="${field}" data-d="-1" aria-label="Meno" ${value <= lo ? 'disabled' : ''}>−</button>
+    <input id="${id}" data-field="${field}" type="text" inputmode="numeric" value="${value}" aria-label="Valore">
+    <button type="button" data-act="pstep" data-field="${field}" data-d="1" aria-label="Più" ${value >= hi ? 'disabled' : ''}>+</button>
+  </div>`;
+}
+function patchView() {
+  const P2 = S.patch, tot = patchTotal(), multi = P2.parts.length > 1;
+  const res = P2.done ? computePatch() : null;
+  let rows = '';
+  if (res && res.rows) {
+    let lastU = 0;
+    for (const r of res.rows) {
+      if (r.u !== lastU) { rows += `<div class="prow uhead"><p class="sec-title">Universo ${r.u}</p></div>`; lastU = r.u; }
+      rows += `<div class="prow"><span class="no">#${String(r.i).padStart(2, '0')}</span><span class="uni">${r.u}.${pad3(r.from)}</span>
+        <span class="rng"><b>${pad3(r.from)}</b> <span>– ${pad3(r.to)}</span></span>
+        ${multi ? `<div class="sub">${r.parts.map(p => `<span>${esc(p.name)} ${pad3(p.from)}–${pad3(p.to)}</span>`).join('')}</div>` : ''}</div>`;
+    }
+  }
+  const last = res && res.rows && res.rows[res.rows.length - 1];
+  return `
+  <div><button class="btn ghost back" type="button" data-act="nav" data-to="home">${ico.back} Home</button></div>
+  <section class="panel" aria-label="Parametri patch">
+    <div class="panel-head"><p class="sec-title">Parametri</p></div>
+    <div class="panel-body" style="gap:4px">
+      <div class="row"><span class="k">Numero di fixture</span>${stepper('pt-n', 'n', P2.n, 1, 999)}</div>
+      <div class="row"><span class="k">Indirizzo di partenza</span>${stepper('pt-start', 'start', P2.start, 1, 512)}</div>
+    </div>
+  </section>
+  <section class="panel" aria-label="Fixture">
+    <div class="panel-head"><p class="sec-title">Fixture</p><span class="chip num">Totale ${tot} ch</span></div>
+    <div class="panel-body" style="gap:4px">
+      ${P2.parts.map((p, k) => multi ? `<div class="part">
+          <input class="input" id="pt-name-${k}" data-pname="${k}" type="text" maxlength="24" value="${esc(p.name)}" placeholder="${k === 0 ? 'Fixture' : `Sub ${k + 1}`}">
+          ${stepper(`pt-ch-${k}`, `ch:${k}`, p.ch, 1, 512)}
+          <button class="btn ghost rm" type="button" data-act="prm" data-k="${k}" aria-label="Rimuovi subfixture">✕</button>
+        </div>` : `<div class="row"><span class="k">Canali</span>${stepper(`pt-ch-${k}`, `ch:${k}`, p.ch, 1, 512)}</div>`).join('')}
+      <button class="btn block" type="button" data-act="padd" style="margin-top:8px">+ Aggiungi subfixture</button>
+      <button class="btn primary block" type="button" data-act="pgen" style="margin-top:4px">Genera patch</button>
+    </div>
+  </section>
+  ${res && res.error ? `<p class="note">${res.error}</p>` : ''}
+  ${res && res.rows ? `
+  <section class="panel" aria-label="Indirizzi">
+    <div class="panel-head"><p class="sec-title">Indirizzi</p></div>
+    <div class="panel-body" style="gap:8px">
+      <div class="patch-sum">
+        <span class="chip num">${P2.n} fixture</span>
+        <span class="chip num">${P2.n * tot} canali</span>
+        <span class="chip muted num">${last.u > 1 ? `Universi 1–${last.u}` : 'Universo 1'}</span>
+        <span class="chip muted num">Ultima: ${last.u}.${pad3(last.from)}</span>
+      </div>
+      <div>${rows}</div>
+    </div>
+  </section>` : ''}`;
+}
+function setPatchField(field, v) {
+  const P2 = S.patch;
+  if (field === 'n') P2.n = clampInt(v, 1, 999);
+  else if (field === 'start') P2.start = clampInt(v, 1, 512);
+  else if (field.startsWith('ch:')) P2.parts[Number(field.slice(3))].ch = clampInt(v, 1, 512);
+  store.set('dmxelf.patch', P2); render();
+}
+
 const disp = v => S.pct ? Math.round(v / 2.55) : v;
 function faderView(f) {
   const slots = f.slots || [];
@@ -1274,6 +1445,16 @@ document.addEventListener('click', async e => {
     S.view = to; S.current = null; S.confirm = null; clearDrafts(); render(); window.scrollTo(0, 0); return;
   }
   if (act === 'unit') { S.pct = b.dataset.val === '1'; render(); return; }
+  if (act === 'dip-sw') { setDip(S.dip.addr ^ Number(b.dataset.w)); return; }
+  if (act === 'dip-reset') { setDip(0); return; }
+  if (act === 'dip-move') { const n = S.dip.addr + Number(b.dataset.d) * S.dip.step; if (n >= 1 && n <= 511) setDip(n); else toast('Fuori dal range 1–511'); return; }
+  if (act === 'pstep') {
+    const f2 = b.dataset.field, cur = f2 === 'n' ? S.patch.n : f2 === 'start' ? S.patch.start : S.patch.parts[Number(f2.slice(3))].ch;
+    setPatchField(f2, cur + Number(b.dataset.d)); return;
+  }
+  if (act === 'padd') { S.patch.parts.push({ name: '', ch: 1 }); store.set('dmxelf.patch', S.patch); render(); return; }
+  if (act === 'prm') { S.patch.parts.splice(Number(b.dataset.k), 1); if (!S.patch.parts.length) S.patch.parts.push({ name: '', ch: 1 }); store.set('dmxelf.patch', S.patch); render(); return; }
+  if (act === 'pgen') { S.patch.done = true; store.set('dmxelf.patch', S.patch); render(); return; }
   const f = card ? S.fixtures.get(card.dataset.uid) : S.current;
   if (!f) return;
   switch (act) {
@@ -1361,7 +1542,12 @@ const endDrag = () => { if (!drag) return; drag = null; if (renderQueued) { rend
 document.addEventListener('pointerup', endDrag);
 document.addEventListener('pointercancel', endDrag);
 document.addEventListener('change', e => {
-  if (!e.target.classList.contains('fd-val')) return;
+  const t = e.target;
+  if (t.id === 'dip-addr') { const n = parseInt(t.value, 10); if (isNaN(n) || n < 0 || n > 511) { toast('Con 9 switch l\'indirizzo va da 1 a 511'); render(); } else setDip(n); return; }
+  if (t.id === 'dip-stepv') { S.dip.step = clampInt(t.value, 1, 511); store.set('dmxelf.dip', S.dip); render(); return; }
+  if (t.dataset && t.dataset.field && t.closest('.stepper')) { setPatchField(t.dataset.field, t.value); return; }
+  if (t.dataset && t.dataset.pname !== undefined) { S.patch.parts[Number(t.dataset.pname)].name = t.value.trim(); store.set('dmxelf.patch', S.patch); render(); return; }
+  if (!t.classList.contains('fd-val')) return;
   const ch = Number(e.target.dataset.ch), n = parseInt(e.target.value, 10);
   if (isNaN(n)) { e.target.value = disp(dmx.buf[ch]); return; }
   setFader(ch, S.pct ? Math.round(Math.max(0, Math.min(100, n)) * 2.55) : n);
@@ -1375,7 +1561,7 @@ document.addEventListener('keydown', e => {
     if (e.key in map) { e.preventDefault(); setFader(ch, map[e.key]); }
     return;
   }
-  if (e.key === 'Enter' && e.target.classList && e.target.classList.contains('fd-val')) e.target.blur();
+  if (e.key === 'Enter' && e.target.classList && (e.target.classList.contains('fd-val') || e.target.classList.contains('dip-num') || e.target.closest('.stepper') || e.target.closest('.dip-step') || e.target.dataset.pname !== undefined)) e.target.blur();
   if (e.key === 'Enter' && e.target.id === 'in-addr') document.querySelector('[data-act="addr-set"]')?.click();
   if (e.key === 'Enter' && e.target.id === 'in-label') document.querySelector('[data-act="label-set"]')?.click();
 });
