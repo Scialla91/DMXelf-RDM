@@ -1,6 +1,6 @@
 <title>DMXelf RDM</title>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <style>
@@ -53,7 +53,7 @@
 }
 
 * { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; touch-action: manipulation; }   /* niente zoom col doppio tocco */
 body {
   margin: 0; background: var(--bg); color: var(--text);
   font: 15px/1.55 var(--font);
@@ -62,7 +62,8 @@ body {
 body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--surface); }
 [hidden] { display: none !important; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
-button, input, select { font: inherit; color: inherit; }
+button, input, select { font: inherit; color: inherit; touch-action: manipulation; }
+input, select, textarea { font-size: max(16px, 1em); }   /* iOS ingrandisce i campi con testo sotto i 16px */
 .wrap { max-width: 640px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 .num { font-variant-numeric: tabular-nums; }
 .mono { font-family: var(--mono); font-size: .86em; letter-spacing: .01em; }
@@ -259,7 +260,7 @@ main { padding-block: 20px 24px; display: grid; gap: 22px; }
 .fader .fill::before { content: ""; position: absolute; left: 8px; right: 8px; top: 4px; height: 3px; border-radius: 2px; background: var(--accent-ink); opacity: .75; }
 .fader.fine .fill { background: color-mix(in srgb, var(--accent) 55%, var(--surface-2)); }
 .fader:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.fd-val { width: 100%; height: 34px; text-align: center; padding: 0 2px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--text); font-weight: 650; font-variant-numeric: tabular-nums; font-size: .92rem; }
+.fd-val { width: 100%; height: 34px; text-align: center; padding: 0 2px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--text); font-weight: 650; font-variant-numeric: tabular-nums; font-size: 16px; }
 .fd-val:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .fd-ch { font-size: .66rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 @media (max-width: 340px) { .faders { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
@@ -1328,7 +1329,7 @@ function patchView() {
   return `
   <div><button class="btn ghost back" type="button" data-act="nav" data-to="home">${ico.back} Home</button></div>
   <section class="panel" aria-label="Parametri patch">
-    <div class="panel-head"><p class="sec-title">Parametri</p></div>
+    <div class="panel-head"><p class="sec-title">Parametri</p><button class="btn ghost" type="button" data-act="preset" style="min-height:34px;padding:0 10px">Azzera</button></div>
     <div class="panel-body" style="gap:4px">
       <div class="row"><span class="k">Numero di fixture</span>${stepper('pt-n', 'n', P2.n, 1, 999)}</div>
       <div class="row"><span class="k">Indirizzo di partenza</span>${stepper('pt-start', 'start', P2.start, 1, 512)}</div>
@@ -1454,6 +1455,7 @@ document.addEventListener('click', async e => {
   }
   if (act === 'padd') { S.patch.parts.push({ name: '', ch: 1 }); store.set('dmxelf.patch', S.patch); render(); return; }
   if (act === 'prm') { S.patch.parts.splice(Number(b.dataset.k), 1); if (!S.patch.parts.length) S.patch.parts.push({ name: '', ch: 1 }); store.set('dmxelf.patch', S.patch); render(); return; }
+  if (act === 'preset') { S.patch = { n: 1, start: 1, parts: [{ name: '', ch: 1 }], done: false }; store.set('dmxelf.patch', S.patch); render(); toast('Patch azzerato'); return; }
   if (act === 'pgen') { S.patch.done = true; store.set('dmxelf.patch', S.patch); render(); return; }
   const f = card ? S.fixtures.get(card.dataset.uid) : S.current;
   if (!f) return;
