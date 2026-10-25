@@ -244,6 +244,10 @@ main { padding-block: 20px 24px; display: grid; gap: 22px; }
 }
 .tile:hover { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); box-shadow: var(--shadow); }
 .tile:active { transform: scale(.98); }
+.tile.editing { cursor: default; border-style: dashed; min-height: 0; }
+.tile.editing:active { transform: none; }
+.tile .move { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tile .move .btn { min-height: 40px; padding: 0; }
 .t-ico { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
 .tile b { font-size: 1.05rem; font-weight: 650; letter-spacing: -.01em; }
 .tile span { font-size: .82rem; color: var(--muted); line-height: 1.4; }
@@ -1009,30 +1013,33 @@ function deviceCard() {
   </section>`;
 }
 
+const TILES = [
+  { id: 'list', ico: `<span class="t-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.8"/><rect x="4" y="14" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.8"/><path d="M14 6h6M14 9h4M14 16h6M14 19h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>`, title: 'RDM Control', desc: 'Indirizzo, modo, ore, sensori e impostazioni via RDM' },
+  { id: 'fc', ico: `<span class="t-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 3v18M12 3v18M18 3v18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".45"/><rect x="3.5" y="12" width="5" height="3.5" rx="1" fill="currentColor"/><rect x="9.5" y="6" width="5" height="3.5" rx="1" fill="currentColor"/><rect x="15.5" y="15" width="5" height="3.5" rx="1" fill="currentColor"/></svg></span>`, title: 'Fixture Control', desc: 'Fader sui canali del modo attivo, letti dalla fixture via RDM' },
+  { id: 'dmx', ico: `<span class="t-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3" stroke="currentColor" stroke-width="1.8"/><path d="M8 8v8M12 8v8M16 8v8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".45"/><rect x="6.6" y="12" width="2.8" height="2.4" rx=".6" fill="currentColor"/><rect x="10.6" y="9" width="2.8" height="2.4" rx=".6" fill="currentColor"/><rect x="14.6" y="13.5" width="2.8" height="2.4" rx=".6" fill="currentColor"/></svg></span>`, title: 'DMX Output', desc: 'Fader sui 512 canali per provare fixture senza banco' },
+  { id: 'dip', ico: `<span class="t-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2" stroke="currentColor" stroke-width="1.8"/><rect x="6" y="9" width="2.6" height="3" rx=".6" fill="currentColor"/><rect x="10.7" y="12" width="2.6" height="3" rx=".6" fill="currentColor"/><rect x="15.4" y="9" width="2.6" height="3" rx=".6" fill="currentColor"/></svg></span>`, title: 'DIP Switch', desc: 'Da indirizzo a switch e viceversa, anche senza DMXelf' },
+  { id: 'patch', ico: `<span class="t-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h2M4 12h2M4 18h2M9 6h11M9 12h11M9 18h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>`, title: 'Patch', desc: 'Indirizzi di una serie di fixture, con universi e subfixture' }
+];
+function tileOrder() {
+  const saved = store.get('dmxelf.tiles', []).filter(id => TILES.some(t => t.id === id));
+  return [...saved, ...TILES.map(t => t.id).filter(id => !saved.includes(id))];   // sezioni nuove in coda
+}
 function homeView() {
+  const order = tileOrder(), ed = S.editTiles;
   return `${deviceCard()}
-  <section class="tiles" aria-label="Funzioni">
-    <button class="tile" type="button" data-act="nav" data-to="list">
-      <span class="t-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.8"/><rect x="4" y="14" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.8"/><path d="M14 6h6M14 9h4M14 16h6M14 19h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>
-      <b>RDM Control</b><span>Indirizzo, modo, ore, sensori e impostazioni via RDM</span>
-    </button>
-    <button class="tile" type="button" data-act="nav" data-to="fc">
-      <span class="t-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 3v18M12 3v18M18 3v18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".45"/><rect x="3.5" y="12" width="5" height="3.5" rx="1" fill="currentColor"/><rect x="9.5" y="6" width="5" height="3.5" rx="1" fill="currentColor"/><rect x="15.5" y="15" width="5" height="3.5" rx="1" fill="currentColor"/></svg></span>
-      <b>Fixture Control</b><span>Fader sui canali del modo attivo, letti dalla fixture via RDM</span>
-    </button>
-    <button class="tile" type="button" data-act="nav" data-to="dmx">
-      <span class="t-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3" stroke="currentColor" stroke-width="1.8"/><path d="M8 8v8M12 8v8M16 8v8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".45"/><rect x="6.6" y="12" width="2.8" height="2.4" rx=".6" fill="currentColor"/><rect x="10.6" y="9" width="2.8" height="2.4" rx=".6" fill="currentColor"/><rect x="14.6" y="13.5" width="2.8" height="2.4" rx=".6" fill="currentColor"/></svg></span>
-      <b>DMX Output</b><span>Fader sui 512 canali per provare fixture senza banco</span>
-    </button>
-    <button class="tile" type="button" data-act="nav" data-to="dip">
-      <span class="t-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2" stroke="currentColor" stroke-width="1.8"/><rect x="6" y="9" width="2.6" height="3" rx=".6" fill="currentColor"/><rect x="10.7" y="12" width="2.6" height="3" rx=".6" fill="currentColor"/><rect x="15.4" y="9" width="2.6" height="3" rx=".6" fill="currentColor"/></svg></span>
-      <b>DIP Switch</b><span>Da indirizzo a switch e viceversa, anche senza DMXelf</span>
-    </button>
-    <button class="tile" type="button" data-act="nav" data-to="patch">
-      <span class="t-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h2M4 12h2M4 18h2M9 6h11M9 12h11M9 18h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>
-      <b>Patch</b><span>Indirizzi di una serie di fixture, con universi e subfixture</span>
-    </button>
-  </section>`;
+  <div class="sec-head"><p class="sec-title">Sezioni</p>
+    <button class="btn ${ed ? 'primary' : 'ghost'}" type="button" data-act="tiles-edit" style="min-height:34px;padding:0 12px">${ed ? 'Fine' : 'Riordina'}</button></div>
+  <section class="tiles" aria-label="Sezioni">
+    ${order.map((id, k) => { const t = TILES.find(x => x.id === id);
+      return ed ? `<div class="tile editing">
+        ${t.ico}<b>${t.title}</b>
+        <div class="move">
+          <button class="btn" type="button" data-act="tile-move" data-id="${id}" data-d="-1" aria-label="Sposta ${t.title} prima" ${k === 0 ? 'disabled' : ''}>${ico.back}</button>
+          <button class="btn" type="button" data-act="tile-move" data-id="${id}" data-d="1" aria-label="Sposta ${t.title} dopo" ${k === order.length - 1 ? 'disabled' : ''}>${ico.chev}</button>
+        </div></div>`
+      : `<button class="tile" type="button" data-act="nav" data-to="${id}">${t.ico}<b>${t.title}</b><span>${t.desc}</span></button>`; }).join('')}
+  </section>
+  ${ed ? '<p class="note">Usa le frecce per spostare le sezioni. L\'ordine resta salvato su questo telefono.</p>' : ''}`;
 }
 function fixtureCard(f, area) {
   const mode = f.personality ? `Modo ${f.personality}/${f.personalityCount || '?'}${f.footprint ? ` · ${f.footprint} ch` : ''}` : '';
@@ -1379,6 +1386,8 @@ function dmxView() {
 function dmxGoTo(n) {
   if (!(n >= 1 && n <= 512)) { toast('Canale valido: da 1 a 512'); return; }
   S.dmxPage = Math.floor((n - 1) / DMX_PAGE) * DMX_PAGE + 1; S.dmxTarget = n; render(true);
+  const el = document.querySelector('.fd.target');
+  if (el) el.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
 }
 
 const disp = v => S.pct ? Math.round(v / 2.55) : v;
@@ -1458,7 +1467,7 @@ document.addEventListener('click', async e => {
   const card = b.closest('[data-uid]');
   if (act === 'nav') {
     const to = b.dataset.to;
-    const from = S.view;
+    const from = S.view; S.editTiles = false;
     if (to === 'home' && dmx.active) { dmxRelease(); toast('Uscita DMX azzerata e fermata'); }
     if (to === 'home' && S.scanning) T?.stopScan();
     if (to === 'home') resetList();
@@ -1466,6 +1475,12 @@ document.addEventListener('click', async e => {
     if (to === 'dmx' && S.connected) { dmxForIdentify = false; dmxBegin().then(() => render()); }
     if (from === 'home' && (to === 'list' || to === 'fc')) { resetList(); if (S.connected) scan(); }   // ingresso nella sezione: lista nuova + scansione automatica
     return;
+  }
+  if (act === 'tiles-edit') { S.editTiles = !S.editTiles; render(); return; }
+  if (act === 'tile-move') {
+    const o = tileOrder(), k = o.indexOf(b.dataset.id), n = k + Number(b.dataset.d);
+    if (n >= 0 && n < o.length) { [o[k], o[n]] = [o[n], o[k]]; store.set('dmxelf.tiles', o); }
+    render(); return;
   }
   if (act === 'unit') { S.pct = b.dataset.val === '1'; render(); return; }
   if (act === 'dmx-page') { S.dmxPage = Math.max(1, Math.min(512 - DMX_PAGE + 1, S.dmxPage + Number(b.dataset.d) * DMX_PAGE)); S.dmxTarget = 0; render(); return; }
