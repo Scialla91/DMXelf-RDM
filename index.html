@@ -518,7 +518,7 @@ const bleT = {
     const srv = await dev.gatt.connect();
     const s = await srv.getPrimaryService(SVC);
     this.ch = {};
-    this.rtt = 0; this.sel = null; this.rdmChunk = 20; this.rdmOk = false; this.authOk = false;
+    this.rtt = 0; this.sel = null; this.rdmChunk = 512; this.rdmOk = false;
     for (const k of ['101', '102', '109', '10a', '10b', '10c']) {
       try { this.ch[k] = await s.getCharacteristic(UUID(k.slice(1))); log('rx', 'Caratteristica C' + k.toUpperCase() + ' OK'); }
       catch (e) { log('er', 'Caratteristica C' + k.toUpperCase() + ': ' + e.message); }
@@ -535,7 +535,6 @@ const bleT = {
     if (this.ch['10c']) {
       try { await gatt(() => this.ch['10c'].startNotifications()); } catch {}
     }
-    await this.auth();
     return dev.name || 'DMXelf';
   },
   disconnect() { try { this.dev?.gatt?.disconnect(); } catch {} },
@@ -546,32 +545,6 @@ const bleT = {
         : ch.writeValueWithResponse ? ch.writeValueWithResponse(part) : ch.writeValue(part));
       if (i + chunk < data.length) await sleep(10);
     }
-  },
-  async auth() {
-    // 1° tentativo: 21 byte in un solo pacchetto; se il DMXelf non risponde, 2° tentativo spezzato 20+1 (come la libreria dell'app originale)
-    for (const chunk of [512, 20]) {
-      const ok = await this.authTry(chunk);
-      if (ok) { this.authOk = true; return; }
-    }
-    this.authOk = false;
-    log('er', 'Autenticazione: il DMXelf non ha risposto in nessuna delle due modalità');
-  },
-  async authTry(chunk) {
-    const c = this.ch['101']; if (!c) return false;
-    const req = [0x50, 0, 0, 0, 1]; for (let i = 0; i < 16; i++) req.push(Math.floor(Math.random() * 10));
-    const a = req.slice(5, 13).reduce((s, b) => s + b, 0), b = req.slice(13, 21).reduce((s, x) => s + x, 0);
-    const expect = b ? a % b : -1;
-    return new Promise(async resolve => {
-      const h = e => {
-        const v = dv2a(e.target.value);
-        if (v.length === 17 && v[0] === 0x60) { log('rx', 'AUTH ' + hx(v)); done(true, ((v[15] << 8) | v[16]) === expect ? `Autenticazione OK (${chunk > 20 ? 'pacchetto unico' : 'pacchetti da 20'})` : 'Autenticazione: risposta ricevuta ma codice diverso dall\'atteso'); }
-      };
-      const done = (ok, msg) => { clearTimeout(t); c.removeEventListener('characteristicvaluechanged', h); gatt(() => c.stopNotifications()).catch(() => {}); log(ok ? 'rx' : 'er', msg); resolve(ok); };
-      const t = setTimeout(() => done(false, `Autenticazione: nessuna risposta (${chunk > 20 ? 'pacchetto unico' : 'pacchetti da 20'})`), 2000);
-      c.addEventListener('characteristicvaluechanged', h);
-      try { await gatt(() => c.startNotifications()); log('tx', 'AUTH ' + hx(req)); await this.write(c, req, false, chunk); }
-      catch (e) { done(false, 'Autenticazione non riuscita: ' + e.message); }
-    });
   },
   onRdm(v) {
     log('rx', 'C10A ' + hx(v));
@@ -597,8 +570,8 @@ const bleT = {
     for (let attempt = 0; attempt < 2; attempt++) {
       const frame = buildFrame(uid, cc, pid, data);
       this.rx = [];
-      // primo tentativo: attesa adattiva (4 x tempo medio di risposta, min 350 ms); secondo tentativo: 1300 ms
-      const wait = attempt === 0 && this.rtt ? Math.min(1300, Math.max(350, Math.round(this.rtt * 4 + 150))) : 1300;
+      // primo tentativo: attesa adattiva (4 x tempo medio di risposta, min 500 ms); secondo tentativo: 1300 ms
+      const wait = attempt === 0 && this.rtt ? Math.min(1300, Math.max(500, Math.round(this.rtt * 4 + 150))) : 1300;
       const t0 = performance.now();
       const r = await new Promise(resolve => {
         const t = setTimeout(() => { this.pending = null; resolve(null); }, wait);
@@ -625,7 +598,7 @@ const bleT = {
     }
     await sleep(500);
     this.scanN = 0; this.dub = [];
-    log('rx', `Ricerca RDM avviata (autenticazione: ${this.authOk ? 'OK' : 'non confermata'})`);
+    log('rx', 'Ricerca RDM avviata');
     return new Promise(async resolve => {
       let ended = false;
       const end = () => { if (ended) return; ended = true; clearTimeout(safety); this.scanCb = null; resolve(); };
@@ -693,7 +666,6 @@ const S = {
 };
 // Nessuna fixture salvata tra una sessione e l'altra: la lista nasce solo dalla scansione.
 // S.fixtures resta come cache in memoria (modello, produttore, modi) per velocizzare le scansioni successive.
-try { localStorage.removeItem('dmxelf.fixtures'); } catch {}
 function save() {}
 function resetList() {
   for (const f of S.fixtures.values()) { if (f.identify && S.connected) set(f, P.IDENTIFY_DEVICE, [0]); f.identify = false; f.found = false; }
@@ -701,13 +673,13 @@ function resetList() {
 }
 function fixtureFor(uid) {
   const k = uidStr(uid);
-  if (!S.fixtures.has(k)) S.fixtures.set(k, { uid: Array.from(uid), uidStr: k, label: '', model: '', manufacturer: '', address: null });
+  if (!S.fixtures.has(k)) S.fixtures.set(k, { uid: Array.from(uid), uidStr: k, label: undefined, model: '', manufacturer: '', address: null });
   return S.fixtures.get(k);
 }
 function onStatus(v) {
   if (v.length > 3) S.battery = v[0];
   if (v[1]) S.fw = [v[1], ...[v[2], v[3], v[4]].filter(x => x).map(x => String(x).padStart(2, '0'))].join('.');
-  render();
+  if (S.view === 'home') render();                    // batteria/versione compaiono solo nella home
 }
 /* ---------- uscita DMX (Fixture Control) ---------- */
 const dmx = { buf: new Uint8Array(513), active: false, q: new Map(), scheduled: false };
@@ -830,7 +802,7 @@ async function openDetail(f) {
   if (S.current !== f) return;
   await getInto(f, P.DEVICE_INFO, [], pd => applyInfo(f, pd));
   render();
-  await getInto(f, P.DEVICE_LABEL, [], pd => f.label = str(pd));
+  if (f.label === undefined) await getInto(f, P.DEVICE_LABEL, [], pd => f.label = str(pd));
   if (!f.model) await getInto(f, P.DEVICE_MODEL_DESCRIPTION, [], pd => f.model = str(pd));
   if (!f.manufacturer) await getInto(f, P.MANUFACTURER_LABEL, [], pd => f.manufacturer = str(pd));
   if (!f.v.sw) await getInto(f, P.SOFTWARE_VERSION_LABEL, [], pd => f.v.sw = str(pd));
@@ -927,6 +899,28 @@ async function loadSensors(f, withDefs) {
   });
   render();
 }
+// La fixture può confermare un SET senza applicarlo subito: rileggo DEVICE_INFO e, se serve, reinvio (max 3 volte)
+async function applyVerified(f, pid, data, check, okMsg, failMsg) {
+  S.applying = true; render(true);
+  let ok = false;
+  for (let i = 1; i <= 3 && !ok; i++) {
+    const r = await set(f, pid, data);
+    if (r.status === 'nack') { toast(NACK[r.code] || 'Comando rifiutato'); break; }
+    if (r.status !== 'ack') { log('er', `Nessuna conferma dalla fixture (tentativo ${i}/3)`); continue; }
+    for (const wait of [300, 700, 1200]) {
+      await sleep(wait);
+      const g = await get(f, P.DEVICE_INFO);
+      if (g.status === 'ack') { applyInfo(f, g.pd); if (check(f)) { ok = true; break; } }
+    }
+    if (!ok && i < 3) log('er', `La fixture ha confermato ma non risulta applicato: reinvio (${i + 1}/3)`);
+  }
+  const p = (f.personalities || []).find(x => x.n === f.personality); f.modeName = p ? p.name : f.modeName;
+  S.applying = false;
+  toast(ok ? okMsg : failMsg);
+  if (!ok) log('er', failMsg);
+  save(); render(true);
+  return ok;
+}
 async function apply(f, pid, data, okMsg, after) {
   const r = await set(f, pid, data);
   if (r.status === 'ack') { toast(okMsg); if (after) await after(); }
@@ -949,8 +943,13 @@ const fxTitle = f => f.label || f.model || 'Fixture RDM';
 const fxRange = f => f.address ? (f.footprint ? `${pad3(f.address)}–${pad3(f.address + f.footprint - 1)}` : pad3(f.address)) : '—';
 
 let drag = null, renderQueued = false;
-function render() {
-  if (drag) { renderQueued = true; return; }          // non ridisegnare mentre muovi un fader
+function editing() {
+  const a = document.activeElement;
+  return !!a && $('#app').contains(a) && (a.tagName === 'SELECT' || (a.tagName === 'INPUT' && a.type !== 'button' && a.type !== 'range'));
+}
+function render(force) {
+  // non ridisegnare mentre muovi un fader o mentre un menu/campo è aperto: si chiuderebbe sotto il dito
+  if (drag || (!force && editing())) { renderQueued = true; return; }
   const pill = $('#conn-pill');
   pill.className = 'pill' + (S.connected ? ' on' : '');
   $('#conn-text').textContent = S.connected ? 'Collegato' : (S.connecting ? 'Collego…' : 'Non collegato');
@@ -1017,10 +1016,9 @@ function homeView() {
   </section>`;
 }
 function fixtureCard(f, area) {
-  const off = false;
   const mode = f.personality ? `Modo ${f.personality}/${f.personalityCount || '?'}${f.footprint ? ` · ${f.footprint} ch` : ''}` : '';
   return `
-  <article class="fx ${f.identify ? 'is-ident' : ''} ${off || !S.connected ? 'offline' : ''}" data-uid="${f.uidStr}">
+  <article class="fx ${f.identify ? 'is-ident' : ''} ${!S.connected ? 'offline' : ''}" data-uid="${f.uidStr}">
     <div class="fx-top">
       <div class="fx-addr num"><span>DMX</span><b>${f.address ? pad3(f.address) : '—'}</b></div>
       <div class="fx-text">
@@ -1030,15 +1028,14 @@ function fixtureCard(f, area) {
           ${f.label && f.model ? `<span class="chip muted">${esc(f.model)}</span>` : ''}
           ${mode ? `<span class="chip num">${esc(mode)}</span>` : ''}
           <span class="chip muted mono">${f.uidStr}</span>
-          ${off ? '<span class="chip muted">Non trovata</span>' : ''}
         </div>
       </div>
     </div>
     <div class="fx-actions">
-      <button class="btn ident-btn" type="button" data-act="ident" aria-pressed="${!!f.identify}" ${!S.connected || off ? 'disabled' : ''}><span class="bulb"></span>${f.identify ? 'Identify ON' : 'Identify'}</button>
+      <button class="btn ident-btn" type="button" data-act="ident" aria-pressed="${!!f.identify}" ${!S.connected ? 'disabled' : ''}><span class="bulb"></span>${f.identify ? 'Identify ON' : 'Identify'}</button>
       ${area === 'fc'
-        ? `<button class="btn primary" type="button" data-act="faders" ${!S.connected || off ? 'disabled' : ''}>Fader ${ico.chev}</button>`
-        : `<button class="btn primary" type="button" data-act="rdm" ${!S.connected || off ? 'disabled' : ''}>RDM ${ico.chev}</button>`}
+        ? `<button class="btn primary" type="button" data-act="faders" ${!S.connected ? 'disabled' : ''}>Fader ${ico.chev}</button>`
+        : `<button class="btn primary" type="button" data-act="rdm" ${!S.connected ? 'disabled' : ''}>RDM ${ico.chev}</button>`}
     </div>
   </article>`;
 }
@@ -1084,7 +1081,7 @@ function detailView(f) {
           <button class="btn step" type="button" data-act="addr-dec" aria-label="Indirizzo meno uno">−</button>
           <input class="input addr grow" id="in-addr" type="number" inputmode="numeric" min="1" max="512" value="${f.address || ''}" ${!S.connected ? 'disabled' : ''}>
           <button class="btn step" type="button" data-act="addr-inc" aria-label="Indirizzo più uno">+</button>
-          <button class="btn primary" type="button" data-act="addr-set" ${!S.connected ? 'disabled' : ''}>Applica</button>
+          <button class="btn primary" type="button" data-act="addr-set" ${!S.connected || S.applying ? 'disabled' : ''}>${S.applying ? spin : 'Applica'}</button>
         </div>
         ${f.footprint && f.address ? `<span class="hint num">Occupa i canali ${fxRange(f)} (${f.footprint} ch)${f.address + f.footprint - 1 > 512 ? ' — supera il canale 512!' : ''}</span>` : ''}
       </div>
@@ -1096,7 +1093,7 @@ function detailView(f) {
             ${pers.length ? pers.map(p => `<option value="${p.n}" ${p.n === f.personality ? 'selected' : ''}>${p.n} · ${esc(p.name)} (${p.ch} ch)</option>`).join('')
               : Array.from({ length: f.personalityCount }, (_, i) => `<option value="${i + 1}" ${i + 1 === f.personality ? 'selected' : ''}>Modo ${i + 1}</option>`).join('')}
           </select>
-          <button class="btn primary" type="button" data-act="mode-set" ${!can(P.DMX_PERSONALITY) ? 'disabled' : ''}>Applica</button>
+          <button class="btn primary" type="button" data-act="mode-set" ${!can(P.DMX_PERSONALITY) || S.applying ? 'disabled' : ''}>${S.applying ? spin : 'Applica'}</button>
         </div>
       </div>` : ''}
     </div>
@@ -1435,18 +1432,11 @@ document.addEventListener('click', async e => {
     case 'addr-set': {
       const n = parseInt($('#in-addr').value, 10);
       if (!(n >= 1 && n <= 512)) return toast('Indirizzo valido: da 1 a 512');
-      return apply(f, P.DMX_START_ADDRESS, u16(n), `Indirizzo impostato a ${pad3(n)}`, async () => {
-        const r = await get(f, P.DMX_START_ADDRESS); f.address = r.status === 'ack' ? rd16(r.pd, 0) : n; delete drafts['in-addr'];
-      });
+      return applyVerified(f, P.DMX_START_ADDRESS, u16(n), x => x.address === n, `Indirizzo impostato a ${pad3(n)}`, `La fixture non ha applicato l'indirizzo ${pad3(n)} (resta ${pad3(f.address || 0)})`).then(() => { delete drafts['in-addr']; render(true); });
     }
     case 'mode-set': {
       const n = parseInt($('#in-mode').value, 10);
-      return apply(f, P.DMX_PERSONALITY, [n], `Modo ${n} impostato`, async () => {
-        const r = await get(f, P.DEVICE_INFO);
-        if (r.status === 'ack') { f.info = decodeInfo(r.pd); Object.assign(f, { personality: f.info.personality, footprint: f.info.footprint, address: f.info.address }); }
-        else f.personality = n;
-        const p = (f.personalities || []).find(x => x.n === f.personality); f.modeName = p ? p.name : ''; delete drafts['in-mode'];
-      });
+      return applyVerified(f, P.DMX_PERSONALITY, [n], x => x.personality === n, `Modo ${n} impostato`, `La fixture non ha applicato il modo ${n}: è ancora in modo ${f.personality}`).then(() => { delete drafts['in-mode']; render(true); });
     }
     case 'label-set': {
       const t = $('#in-label').value.slice(0, 32);
@@ -1500,6 +1490,7 @@ document.addEventListener('pointermove', e => {
   if (!drag) return;
   setFader(drag.ch, drag.v0 + (drag.y0 - e.clientY) / drag.h * 255);
 });
+document.addEventListener('focusout', () => setTimeout(() => { if (renderQueued && !drag && !editing()) { renderQueued = false; render(); } }, 0));
 const endDrag = () => { if (!drag) return; drag = null; if (renderQueued) { renderQueued = false; render(); } };
 document.addEventListener('pointerup', endDrag);
 document.addEventListener('pointercancel', endDrag);
