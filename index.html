@@ -94,7 +94,6 @@ input, select, textarea { font-size: max(16px, 1em); }   /* iOS ingrandisce i ca
 .pill { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 11px; border-radius: 999px; font-size: .8rem; font-weight: 650; background: var(--surface-2); color: var(--muted); white-space: nowrap; }
 .pill .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
 .pill.on { background: var(--ok-soft); color: var(--ok); }
-.pill.demo { background: var(--warn-soft); color: var(--warn); }
 
 main { padding-block: 20px 24px; display: grid; gap: 22px; }
 
@@ -364,6 +363,7 @@ details.log summary::-webkit-details-marker { display: none; }
 <div class="wrap" style="padding-block: 0 40px">
   <details class="log" id="log-box">
     <summary><span>Registro comunicazione</span><span id="log-count">0</span></summary>
+    <div style="padding:0 16px 10px"><button class="btn ghost" type="button" id="btn-copylog" style="min-height:34px;padding:0 10px">Copia registro</button></div>
     <div class="log-body" id="log"></div>
   </details>
 </div>
@@ -482,6 +482,18 @@ function splitFrames(buf, onFrame) {
     onFrame(buf.slice(0, len + 2)); buf = buf.slice(len + 2);
   }
 }
+function decodeDub(buf) {
+  const out = [];
+  for (let i = 0; i < buf.length; i++) {
+    if (buf[i] !== 0xAA || (i > 0 && buf[i - 1] !== 0xFE)) continue;
+    const e = buf.slice(i + 1, i + 17); if (e.length < 16) break;
+    let sum = 0; for (let k = 0; k < 12; k++) sum += e[k];
+    if (sum !== (((e[12] & e[13]) << 8) | (e[14] & e[15]))) continue;
+    out.push([0, 1, 2, 3, 4, 5].map(k => e[2 * k] & e[2 * k + 1]));
+    buf.splice(0, i + 17); i = -1;
+  }
+  return out;
+}
 function parseFrame(f) {
   const pdl = f[23];
   return { src: f.slice(9, 15), rtype: f[16], cc: f[20], pid: rd16(f, 21), pd: f.slice(24, 24 + pdl) };
@@ -506,7 +518,7 @@ const bleT = {
     const srv = await dev.gatt.connect();
     const s = await srv.getPrimaryService(SVC);
     this.ch = {};
-    this.rtt = 0; this.sel = null;
+    this.rtt = 0; this.sel = null; this.rdmChunk = 20; this.rdmOk = false; this.authOk = false;
     for (const k of ['101', '102', '109', '10a', '10b', '10c']) {
       try { this.ch[k] = await s.getCharacteristic(UUID(k.slice(1))); log('rx', 'Caratteristica C' + k.toUpperCase() + ' OK'); }
       catch (e) { log('er', 'Caratteristica C' + k.toUpperCase() + ': ' + e.message); }
@@ -527,43 +539,59 @@ const bleT = {
     return dev.name || 'DMXelf';
   },
   disconnect() { try { this.dev?.gatt?.disconnect(); } catch {} },
-  async write(ch, data, noResp) {
-    for (let i = 0; i < data.length; i += 20) {
-      const part = new Uint8Array(data.slice(i, i + 20));
+  async write(ch, data, noResp, chunk = 20) {
+    for (let i = 0; i < data.length; i += chunk) {
+      const part = new Uint8Array(data.slice(i, i + chunk));
       await gatt(() => noResp && ch.writeValueWithoutResponse ? ch.writeValueWithoutResponse(part)
         : ch.writeValueWithResponse ? ch.writeValueWithResponse(part) : ch.writeValue(part));
-      if (i + 20 < data.length) await sleep(10);
+      if (i + chunk < data.length) await sleep(10);
     }
   },
   async auth() {
-    const c = this.ch['101']; if (!c) return;
+    // 1° tentativo: 21 byte in un solo pacchetto; se il DMXelf non risponde, 2° tentativo spezzato 20+1 (come la libreria dell'app originale)
+    for (const chunk of [512, 20]) {
+      const ok = await this.authTry(chunk);
+      if (ok) { this.authOk = true; return; }
+    }
+    this.authOk = false;
+    log('er', 'Autenticazione: il DMXelf non ha risposto in nessuna delle due modalità');
+  },
+  async authTry(chunk) {
+    const c = this.ch['101']; if (!c) return false;
     const req = [0x50, 0, 0, 0, 1]; for (let i = 0; i < 16; i++) req.push(Math.floor(Math.random() * 10));
     const a = req.slice(5, 13).reduce((s, b) => s + b, 0), b = req.slice(13, 21).reduce((s, x) => s + x, 0);
     const expect = b ? a % b : -1;
-    await new Promise(async resolve => {
+    return new Promise(async resolve => {
       const h = e => {
         const v = dv2a(e.target.value);
-        if (v.length === 17 && v[0] === 0x60) { log('rx', 'AUTH ' + hx(v)); done(((v[15] << 8) | v[16]) === expect ? 'Autenticazione OK' : 'Autenticazione: codice diverso dall\'atteso'); }
+        if (v.length === 17 && v[0] === 0x60) { log('rx', 'AUTH ' + hx(v)); done(true, ((v[15] << 8) | v[16]) === expect ? `Autenticazione OK (${chunk > 20 ? 'pacchetto unico' : 'pacchetti da 20'})` : 'Autenticazione: risposta ricevuta ma codice diverso dall\'atteso'); }
       };
-      const done = msg => { clearTimeout(t); c.removeEventListener('characteristicvaluechanged', h); gatt(() => c.stopNotifications()).catch(() => {}); log(msg.includes('OK') ? 'rx' : 'er', msg); resolve(); };
-      const t = setTimeout(() => done('Autenticazione: nessuna risposta (proseguo)'), 3000);
+      const done = (ok, msg) => { clearTimeout(t); c.removeEventListener('characteristicvaluechanged', h); gatt(() => c.stopNotifications()).catch(() => {}); log(ok ? 'rx' : 'er', msg); resolve(ok); };
+      const t = setTimeout(() => done(false, `Autenticazione: nessuna risposta (${chunk > 20 ? 'pacchetto unico' : 'pacchetti da 20'})`), 2000);
       c.addEventListener('characteristicvaluechanged', h);
-      try { await gatt(() => c.startNotifications()); log('tx', 'AUTH ' + hx(req)); await this.write(c, req, false); }
-      catch (e) { done('Autenticazione non riuscita: ' + e.message); }
+      try { await gatt(() => c.startNotifications()); log('tx', 'AUTH ' + hx(req)); await this.write(c, req, false, chunk); }
+      catch (e) { done(false, 'Autenticazione non riuscita: ' + e.message); }
     });
   },
   onRdm(v) {
     log('rx', 'C10A ' + hx(v));
-    this.rx = splitFrames(this.rx.concat(v.slice(2)), f => {
+    const data = v.slice(2);
+    if (this.scanCb) {                                   // durante la ricerca l'app originale legge anche le risposte di discovery su C10A
+      this.dub = (this.dub || []).concat(data);
+      for (const uid of decodeDub(this.dub)) { log('rx', 'Risposta discovery su C10A: ' + uidStr(uid)); this.scanCb.found(uid); }
+      if (this.dub.length > 512) this.dub = this.dub.slice(-64);
+    }
+    this.rx = splitFrames(this.rx.concat(data), f => {
       const r = parseFrame(f), p = this.pending;
+      if (this.scanCb && r.cc === 0x11 && r.pid === 0x0002) { log('rx', 'Risposta MUTE su C10A: ' + uidStr(r.src)); this.scanCb.found(r.src); }
       if (p && r.pid === p.pid && r.cc === p.cc + 1 && uidStr(r.src) === uidStr(p.uid)) p.resolve(r);
     });
   },
   onScan(v) {
     log('rx', 'C10B ' + hx(v));
     if (!this.scanCb) return;
-    if (v[0] === 0xC1 && v.length >= 7) this.scanCb.found(v.slice(1, 7));
-    else if (v[0] === 0xC2) this.scanCb.done();
+    if (v[0] === 0xC1 && v.length >= 7) { this.scanN++; this.scanCb.found(v.slice(1, 7)); }
+    else if (v[0] === 0xC2) { log('rx', `Il DMXelf ha terminato la ricerca (${this.scanN} risposte C1)`); this.scanCb.done(); }
   },
   async request(uid, cc, pid, data = []) {
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -579,15 +607,25 @@ const bleT = {
           if (x) { const dt = performance.now() - t0; this.rtt = this.rtt ? this.rtt * 0.8 + dt * 0.2 : dt; }
           resolve(x);
         } };
-        log('tx', 'C109 ' + hx(frame));
-        this.write(this.ch['109'], frame, true).catch(e => { log('er', e.message); this.pending?.resolve(null); });
+        log('tx', `C109 ${this.rdmChunk > 20 ? '(intero) ' : ''}` + hx(frame));
+        this.write(this.ch['109'], frame, true, this.rdmChunk).catch(e => { log('er', e.message); this.pending?.resolve(null); });
       });
-      if (r) return r;
+      if (r) { this.rdmOk = true; return r; }
+      // nessuna risposta finora in questa sessione: al secondo tentativo provo l'altra modalità di invio
+      if (attempt === 0 && !this.rdmOk) { this.rdmChunk = this.rdmChunk > 20 ? 20 : 512; log('er', `C109: nessuna risposta, riprovo con ${this.rdmChunk > 20 ? 'frame intero' : 'pacchetti da 20'}`); }
     }
     return null;
   },
   async scan(known, onFound) {
     const c = this.ch['10b'];
+    // come l'app originale all'apertura della pagina RDM: notifiche C10A/C10B disattivate e riattivate, poi 500 ms di attesa
+    for (const k of ['10a', '10b']) {
+      try { await gatt(() => this.ch[k].stopNotifications()); } catch {}
+      try { await gatt(() => this.ch[k].startNotifications()); } catch (e) { log('er', `Notifiche C${k.toUpperCase()}: ${e.message}`); }
+    }
+    await sleep(500);
+    this.scanN = 0; this.dub = [];
+    log('rx', `Ricerca RDM avviata (autenticazione: ${this.authOk ? 'OK' : 'non confermata'})`);
     return new Promise(async resolve => {
       let ended = false;
       const end = () => { if (ended) return; ended = true; clearTimeout(safety); this.scanCb = null; resolve(); };
@@ -613,96 +651,6 @@ const bleT = {
     this.needDmx();
     if (this.sel !== ch) { await this.write(this.ch['101'], [6, ch % 256, ch >> 8, 0, 0], false); this.sel = ch; }
     await this.write(this.ch['102'], [v], true);
-  }
-};
-
-/* =====================================================================
-   Trasporto demo (fixture simulate, nessun Bluetooth)
-   ===================================================================== */
-function simFixture(o) { return Object.assign({ identify: 0, panInv: 0, tiltInv: 0, swap: 0, dispInv: 0, dispLevel: 200, lampState: 1, lampOnMode: 1, power: 0xFF, label: '' }, o); }
-// [tipo, id/primario, descrizione]
-const BEAM_SLOTS = [[0,0x0101],[1,0],[0,0x0102],[1,2],[0,0x0503,'Pan/Tilt speed'],[0,0x0001],[0,0x0404],[0,0x0201],[0,0x0301],[0,0x0303],
-  [0,0x0403],[0,0xFFFF,'Focus'],[0,0x0405],[0,0x0504],[0,0x0502,'Reset/Lamp'],[0,0x0501]];
-const WASH_SLOTS = [[0,0x0001],[1,0],[0,0x0404],[0,0x0205],[0,0x0206],[0,0x0207],[0,0x0212],[0,0x0208],[0,0x0504],[0,0x0405],[0,0x0101],[1,10],
-  [0,0x0102],[1,12],[0,0x0503],[0,0x0502],[0,0xFFFF],[0,0xFFFF],[0,0xFFFF],[0,0x0506],[0,0xFFFF]];
-const SIM = [
-  simFixture({ uid: [0x7F, 0xF0, 0, 0, 1, 0x11], man: 'Demo Lighting', model: 'Beam 280 Demo', label: 'SX 1', addr: 1, pers: 1,
-    modes: [[16, 'Standard'], [20, 'Extended'], [12, 'Compact']], hours: 1532, lamp: 412, sw: 'v2.4.1', modelId: 0x0210,
-    sensors: [['Temperatura testa', 1, 0, 46, 21, 58, 0, 70], ['Temperatura base', 1, 0, 38, 20, 41, 0, 60], ['Ventola testa (rpm)', 0, 0, 3100, 2900, 3300, 0, 5000]],
-    slots: BEAM_SLOTS, pids: [0x80, 0x81, 0x82, 0xE0, 0xE1, 0x120, 0x121, 0x200, 0x201, 0x400, 0x401, 0x403, 0x404, 0x500, 0x501, 0x600, 0x601, 0x602, 0x1001, 0x1010, 0x90] }),
-  simFixture({ uid: [0x7F, 0xF0, 0, 0, 1, 0x12], man: 'Demo Lighting', model: 'Beam 280 Demo', label: 'SX 2', addr: 17, pers: 1,
-    modes: [[16, 'Standard'], [20, 'Extended'], [12, 'Compact']], hours: 1498, lamp: 377, sw: 'v2.4.1', modelId: 0x0210,
-    sensors: [['Temperatura testa', 1, 0, 81, 22, 84, 0, 70], ['Temperatura base', 1, 0, 42, 20, 45, 0, 60]],
-    slots: BEAM_SLOTS, pids: [0x80, 0x81, 0x82, 0xE0, 0xE1, 0x120, 0x121, 0x200, 0x201, 0x400, 0x401, 0x403, 0x404, 0x500, 0x501, 0x600, 0x601, 0x602, 0x1001, 0x1010, 0x90] }),
-  simFixture({ uid: [0x7F, 0xF1, 0, 0, 2, 0x40], man: 'Demo Lighting', model: 'Wash 19x15 Demo', label: '', addr: 101, pers: 2,
-    modes: [[14, 'Basic'], [21, 'Standard'], [67, 'Pixel']], hours: 820, sw: 'v1.0.7', modelId: 0x0305,
-    sensors: [['Temperatura LED', 1, 0, 52, 24, 60, 0, 75]],
-    slots: WASH_SLOTS, pids: [0x80, 0x81, 0x82, 0xE0, 0xE1, 0x120, 0x200, 0x201, 0x400, 0x501, 0x600, 0x601, 0x1001, 0x90] }),
-  simFixture({ uid: [0x7F, 0xF2, 0, 0, 3, 0x07], man: 'Demo FX', model: 'Strobe Demo', label: 'Strobo palco', addr: 301, pers: 1,
-    modes: [[4, '4 canali']], sw: '1.3', modelId: 0x0101, sensors: [], pids: [0x80, 0x81, 0x82, 0xE0, 0xE1] })
-];
-const demoT = {
-  name: 'demo',
-  async connect() { await sleep(400); return 'DMXelf demo'; },
-  disconnect() { onDisconnected(); },
-  async scan(known, onFound) { for (const f of SIM) { await sleep(320); onFound(f.uid.slice()); } await sleep(200); },
-  async stopScan() {},
-  async dmxCmd(b) { log('tx', 'DEMO C101 ' + hx(b)); },
-  async dmxFrame() { log('tx', 'DEMO C102 universo completo'); },
-  async dmxChannel() { await sleep(8); },
-  async request(uid, cc, pid, data = []) {
-    await sleep(45);
-    const f = SIM.find(x => uidStr(x.uid) === uidStr(uid)); if (!f) return null;
-    log('tx', 'DEMO ' + hx(buildFrame(uid, cc, pid, data)));
-    const ack = pd => ({ src: f.uid, rtype: 0, cc: cc + 1, pid, pd });
-    const nack = code => ({ src: f.uid, rtype: 2, cc: cc + 1, pid, pd: u16(code) });
-    if (!REQUIRED.has(pid) && pid !== P.SUPPORTED_PARAMETERS && !f.pids.includes(pid)) return nack(0);
-    const mode = f.modes[f.pers - 1];
-    if (cc === CC.GET) switch (pid) {
-      case P.SUPPORTED_PARAMETERS: return ack(f.pids.flatMap(u16));
-      case P.SLOT_INFO: { const n = mode[0]; const sl = Array.from({ length: n }, (_, i) => (f.slots || [])[i] || [0, 0xFFFF]); return ack(sl.flatMap((x, i) => [...u16(i), x[0], ...u16(x[1])])); }
-      case P.SLOT_DESCRIPTION: { const i = rd16(data, 0), x = (f.slots || [])[i]; return x && x[2] ? ack([...u16(i), ...bytes(x[2])]) : nack(6); }
-      case P.DEVICE_INFO: return ack([1, 0, ...u16(f.modelId), ...u16(0x0101), ...u32(0x020401), ...u16(mode[0]), f.pers, f.modes.length, ...u16(f.addr), 0, 0, f.sensors.length]);
-      case P.SOFTWARE_VERSION_LABEL: return ack(bytes(f.sw));
-      case P.MANUFACTURER_LABEL: return ack(bytes(f.man));
-      case P.DEVICE_MODEL_DESCRIPTION: return ack(bytes(f.model));
-      case P.DEVICE_LABEL: return ack(bytes(f.label));
-      case P.DMX_START_ADDRESS: return ack(u16(f.addr));
-      case P.DMX_PERSONALITY: return ack([f.pers, f.modes.length]);
-      case P.DMX_PERSONALITY_DESCRIPTION: { const m = f.modes[data[0] - 1]; return m ? ack([data[0], ...u16(m[0]), ...bytes(m[1])]) : nack(6); }
-      case P.DEVICE_HOURS: return ack(u32(f.hours));
-      case P.LAMP_HOURS: return ack(u32(f.lamp));
-      case P.LAMP_STATE: return ack([f.lampState]);
-      case P.LAMP_ON_MODE: return ack([f.lampOnMode]);
-      case P.POWER_STATE: return ack([f.power]);
-      case P.DISPLAY_INVERT: return ack([f.dispInv]);
-      case P.DISPLAY_LEVEL: return ack([f.dispLevel]);
-      case P.PAN_INVERT: return ack([f.panInv]);
-      case P.TILT_INVERT: return ack([f.tiltInv]);
-      case P.PAN_TILT_SWAP: return ack([f.swap]);
-      case P.IDENTIFY_DEVICE: return ack([f.identify]);
-      case P.SENSOR_DEFINITION: { const s = f.sensors[data[0]]; return s ? ack([data[0], 0, s[1], s[2], ...u16(0), ...u16(Math.max(200, s[7] * 1.4 | 0)), ...u16(s[6]), ...u16(s[7]), 3, ...bytes(s[0])]) : nack(6); }
-      case P.SENSOR_VALUE: { const s = f.sensors[data[0]]; if (!s) return nack(6); const jit = Math.round((Math.random() - .5) * 2); return ack([data[0], ...u16(s[3] + jit), ...u16(s[4]), ...u16(s[5]), ...u16(0)]); }
-    }
-    if (cc === CC.SET) {
-      const v = data[0];
-      switch (pid) {
-        case P.DMX_START_ADDRESS: f.addr = rd16(data, 0); return ack([]);
-        case P.DMX_PERSONALITY: f.pers = v; return ack([]);
-        case P.DEVICE_LABEL: f.label = str(data); return ack([]);
-        case P.IDENTIFY_DEVICE: f.identify = v; return ack([]);
-        case P.PAN_INVERT: f.panInv = v; return ack([]);
-        case P.TILT_INVERT: f.tiltInv = v; return ack([]);
-        case P.PAN_TILT_SWAP: f.swap = v; return ack([]);
-        case P.DISPLAY_INVERT: f.dispInv = v; return ack([]);
-        case P.DISPLAY_LEVEL: f.dispLevel = v; return ack([]);
-        case P.LAMP_STATE: f.lampState = v; return ack([]);
-        case P.LAMP_ON_MODE: f.lampOnMode = v; return ack([]);
-        case P.POWER_STATE: f.power = v; return ack([]);
-        case P.RESET_DEVICE: case P.FACTORY_DEFAULTS: return ack([]);
-      }
-    }
-    return nack(5);
   }
 };
 
@@ -741,14 +689,15 @@ const S = {
   dip: store.get('dmxelf.dip', { addr: 1, step: 1 }),
   patch: store.get('dmxelf.patch', { n: 8, start: 1, parts: [{ name: '', ch: 16 }], done: false }),
   connected: false, connecting: false, deviceName: '', battery: null, fw: '',
-  scanning: false, fixtures: new Map(), current: null, loadingDetail: false, confirm: null
+  scanning: false, fixtures: new Map(), list: [], current: null, loadingDetail: false, confirm: null
 };
-(function loadSaved() {
-  for (const o of store.get('dmxelf.fixtures', [])) S.fixtures.set(o.uidStr, Object.assign(o, { found: false, identify: false }));
-})();
-function save() {
-  const keep = ['uid', 'uidStr', 'label', 'model', 'manufacturer', 'address', 'footprint', 'personality', 'personalityCount', 'modeName'];
-  store.set('dmxelf.fixtures', [...S.fixtures.values()].map(f => Object.fromEntries(keep.map(k => [k, f[k]]))));
+// Nessuna fixture salvata tra una sessione e l'altra: la lista nasce solo dalla scansione.
+// S.fixtures resta come cache in memoria (modello, produttore, modi) per velocizzare le scansioni successive.
+try { localStorage.removeItem('dmxelf.fixtures'); } catch {}
+function save() {}
+function resetList() {
+  for (const f of S.fixtures.values()) { if (f.identify && S.connected) set(f, P.IDENTIFY_DEVICE, [0]); f.identify = false; f.found = false; }
+  S.list = [];
 }
 function fixtureFor(uid) {
   const k = uidStr(uid);
@@ -799,20 +748,20 @@ function onDisconnected() {
   dmx.active = false; dmx.q.clear(); dmx.buf.fill(0);
   S.connected = false; S.scanning = false; T = null;
   for (const f of S.fixtures.values()) { f.found = false; f.identify = false; }
+  S.list = [];
   if (was) toast('DMXelf scollegato');
   render();
 }
 
 /* ---------- azioni ---------- */
-async function connect(demo) {
+async function connect() {
   if (S.connecting) return;
   S.connecting = true; render();
   try {
-    T = demo ? demoT : bleT;
+    T = bleT;
     S.deviceName = await T.connect();
     S.connected = true;
-    if (demo) { S.battery = 86; S.fw = '1.0.3'; }
-    toast(demo ? 'Modalità demo attiva' : 'DMXelf collegato');
+    toast('DMXelf collegato');
     log('rx', 'Collegato a ' + S.deviceName);
   } catch (e) {
     T = null;
@@ -825,12 +774,16 @@ function disconnect() { const t = T; T = null; t?.disconnect(); onDisconnected()
 
 async function scan() {
   if (!S.connected || S.scanning) return;
+  if (dmx.active) await dmxRelease();                 // uscita DMX ferma prima della ricerca RDM
   S.scanning = true;
-  for (const f of S.fixtures.values()) f.found = false;
+  resetList();
   render();
-  const known = [...S.fixtures.values()].map(f => f.uid);
   const found = [], t0 = performance.now();
-  await T.scan(known, uid => { const f = fixtureFor(uid); if (!f.found) found.push(f); f.found = true; log('rx', 'Trovata ' + f.uidStr); render(); });
+  await T.scan([], uid => {
+    const f = fixtureFor(uid);
+    if (!f.found) { found.push(f); S.list.push(f.uidStr); log('rx', 'Trovata ' + f.uidStr); }
+    f.found = true; render();
+  });
   S.scanning = false; render();
   toast(found.length ? `${found.length} fixture trovate` : 'Nessuna fixture RDM trovata');
   for (const f of found) await loadSummary(f);
@@ -999,8 +952,8 @@ let drag = null, renderQueued = false;
 function render() {
   if (drag) { renderQueued = true; return; }          // non ridisegnare mentre muovi un fader
   const pill = $('#conn-pill');
-  pill.className = 'pill' + (S.connected ? (T?.name === 'demo' ? ' demo' : ' on') : '');
-  $('#conn-text').textContent = S.connected ? (T?.name === 'demo' ? 'Demo' : 'Collegato') : (S.connecting ? 'Collego…' : 'Non collegato');
+  pill.className = 'pill' + (S.connected ? ' on' : '');
+  $('#conn-text').textContent = S.connected ? 'Collegato' : (S.connecting ? 'Collego…' : 'Non collegato');
   const app = $('#app');
   const focusId = document.activeElement?.id, selStart = document.activeElement?.selectionStart;
   app.innerHTML = S.view === 'detail' && S.current ? detailView(S.current)
@@ -1022,9 +975,8 @@ function deviceCard() {
         <div class="device-sub">${hasBT ? 'Accendi il DMXelf e chiudi l\'app ufficiale prima di collegarti.' : 'Questo browser non supporta il Bluetooth. Su iPhone apri la pagina con Bluefy.'}</div>
       </div>
     </div>
-    <div class="actions-grid">
-      <button class="btn primary" id="btn-connect" type="button" ${!hasBT || S.connecting ? 'disabled' : ''}>${S.connecting ? spin + ' Collego…' : 'Collega DMXelf'}</button>
-      <button class="btn" id="btn-demo" type="button" ${S.connecting ? 'disabled' : ''}>Prova in demo</button>
+    <div>
+      <button class="btn primary block" id="btn-connect" type="button" ${!hasBT || S.connecting ? 'disabled' : ''}>${S.connecting ? spin + ' Collego…' : 'Collega DMXelf'}</button>
     </div>
   </section>`;
   return `
@@ -1036,7 +988,6 @@ function deviceCard() {
         <div class="device-meta">
           ${S.battery != null ? `<span class="chip ${S.battery < 20 ? 'muted' : ''} num">Batteria ${S.battery}%</span>` : ''}
           ${S.fw ? `<span class="chip muted num">FW ${esc(S.fw)}</span>` : ''}
-          ${T?.name === 'demo' ? '<span class="chip muted">Fixture simulate</span>' : ''}
         </div>
       </div>
       <button class="btn ghost" id="btn-disconnect" type="button">Scollega</button>
@@ -1066,7 +1017,7 @@ function homeView() {
   </section>`;
 }
 function fixtureCard(f, area) {
-  const off = S.connected && !f.found && !S.scanning;
+  const off = false;
   const mode = f.personality ? `Modo ${f.personality}/${f.personalityCount || '?'}${f.footprint ? ` · ${f.footprint} ch` : ''}` : '';
   return `
   <article class="fx ${f.identify ? 'is-ident' : ''} ${off || !S.connected ? 'offline' : ''}" data-uid="${f.uidStr}">
@@ -1093,23 +1044,22 @@ function fixtureCard(f, area) {
 }
 
 function listView(area) {
-  const all = [...S.fixtures.values()].sort((a, b) => ((!!b.found) - (!!a.found)) || ((a.address || 999) - (b.address || 999)));
-  const shown = all;
-  const foundN = all.filter(f => f.found).length;
+  const shown = S.list.map(k => S.fixtures.get(k)).filter(Boolean).sort((a, b) => (a.address || 999) - (b.address || 999));
+  const foundN = shown.length;
   return `
   <div><button class="btn ghost back" type="button" data-act="nav" data-to="home">${ico.back} Home</button></div>
   <section aria-labelledby="fx-title" style="display:grid;gap:12px">
     <div class="sec-head">
       <div>
         <p class="sec-title">${area === 'fc' ? 'Fixture Control' : 'RDM Control'}</p>
-        <h2 class="page-title" id="fx-title">Fixture <span class="num" style="color:var(--muted);font-weight:500">${S.connected ? foundN : all.length}</span></h2>
+        <h2 class="page-title" id="fx-title">Fixture <span class="num" style="color:var(--muted);font-weight:500">${foundN}</span></h2>
       </div>
       <button class="btn ${S.scanning ? '' : 'primary'}" id="btn-scan" type="button" ${!S.connected ? 'disabled' : ''}>${S.scanning ? spin + ' Ferma' : ico.scan + ' Scansiona'}</button>
     </div>
     ${shown.length ? `<div class="list">${shown.map(f => fixtureCard(f, area)).join('')}</div>` : `
     <div class="empty">
       <b>${S.scanning ? 'Ricerca in corso…' : 'Nessuna fixture'}</b>
-      <span>${S.connected ? 'Collega il DMXelf all\'ingresso DMX della prima fixture e premi Scansiona.' : 'Collega il DMXelf per cercare le fixture RDM sulla linea.'}</span>
+      <span>${!S.connected ? 'Collega il DMXelf dalla Home per cercare le fixture RDM sulla linea.' : S.scanning ? 'Il DMXelf sta interrogando la linea RDM.' : 'Nessuna risposta RDM. Controlla il cavo dall\'uscita del DMXelf all\'ingresso della fixture e premi Scansiona. Il Registro qui sotto mostra cosa ha risposto il DMXelf.'}</span>
     </div>`}
   </section>`;
 }
@@ -1434,16 +1384,26 @@ function sensorRow(s) {
 document.addEventListener('click', async e => {
   const b = e.target.closest('button'); if (!b || b.disabled) return;
   if (b.id === 'theme') return toggleTheme();
-  if (b.id === 'btn-connect') return connect(false);
-  if (b.id === 'btn-demo') return connect(true);
+  if (b.id === 'btn-connect') return connect();
+  if (b.id === 'btn-copylog') {
+    const txt = Array.from(document.querySelectorAll('#log div'), d => d.textContent).reverse().join('\n');
+    try { await navigator.clipboard.writeText(txt); toast('Registro copiato'); }
+    catch { const r = document.createRange(); r.selectNodeContents($('#log')); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); toast('Testo selezionato: tocca Copia'); }
+    return;
+  }
   if (b.id === 'btn-disconnect') return disconnect();
   if (b.id === 'btn-scan') return S.scanning ? T?.stopScan() : scan();
   const act = b.dataset.act; if (!act) return;
   const card = b.closest('[data-uid]');
   if (act === 'nav') {
     const to = b.dataset.to;
+    const from = S.view;
     if (to === 'home' && dmx.active) { dmxRelease(); toast('Uscita DMX azzerata e fermata'); }
-    S.view = to; S.current = null; S.confirm = null; clearDrafts(); render(); window.scrollTo(0, 0); return;
+    if (to === 'home' && S.scanning) T?.stopScan();
+    if (to === 'home') resetList();
+    S.view = to; S.current = null; S.confirm = null; clearDrafts(); render(); window.scrollTo(0, 0);
+    if (from === 'home' && (to === 'list' || to === 'fc')) { resetList(); if (S.connected) scan(); }   // ingresso nella sezione: lista nuova + scansione automatica
+    return;
   }
   if (act === 'unit') { S.pct = b.dataset.val === '1'; render(); return; }
   if (act === 'dip-sw') { setDip(S.dip.addr ^ Number(b.dataset.w)); return; }
