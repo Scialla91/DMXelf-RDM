@@ -311,6 +311,13 @@ main { padding-block: 20px 24px; display: grid; gap: 22px; }
 .prow .sub { grid-column: 3; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: .78rem; color: var(--muted); }
 .prow.uhead { grid-template-columns: 1fr; padding: 14px 0 6px; border-bottom: 0; }
 
+/* DMX Output */
+.fd.target { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.fd.lit .fd-name { color: var(--accent); }
+.pager { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.pager .mid { text-align: center; font-weight: 650; font-variant-numeric: tabular-nums; }
+.goto { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+
 /* Registro */
 details.log { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
 details.log summary { cursor: pointer; padding: 12px 16px; font-size: .78rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); list-style: none; display: flex; justify-content: space-between; }
@@ -661,6 +668,7 @@ const S = {
   view: 'home', pct: false,
   dip: store.get('dmxelf.dip', { addr: 1, step: 1 }),
   patch: store.get('dmxelf.patch', { n: 8, start: 1, parts: [{ name: '', ch: 16 }], done: false }),
+  dmxPage: 1, dmxTarget: 0,
   connected: false, connecting: false, deviceName: '', battery: null, fw: '',
   scanning: false, fixtures: new Map(), list: [], current: null, loadingDetail: false, confirm: null
 };
@@ -776,11 +784,17 @@ async function loadSummary(f) {
   if (!f.manufacturer) { const mf = await get(f, P.MANUFACTURER_LABEL); if (mf.status === 'ack') f.manufacturer = str(mf.pd); }
   render();
 }
+// Dal registro: l'Identify funziona in modo affidabile solo con segnale DMX presente sulla linea.
+// Se l'uscita DMX non è attiva la avvio a zero prima dell'Identify, e la fermo quando nessun Identify è più acceso (fuori dai fader).
+let dmxForIdentify = false;
 async function toggleIdentify(f) {
   const on = !f.identify;
   f.identify = on; render();
+  if (on && !dmx.active) { await dmxBegin(); if (dmx.active) { dmxForIdentify = true; log('rx', 'Uscita DMX a zero avviata per l\'Identify'); } }
   const r = await set(f, P.IDENTIFY_DEVICE, [on ? 1 : 0]);
   if (r.status !== 'ack') { f.identify = !on; toast(r.status === 'nack' ? (NACK[r.code] || 'Identify rifiutato') : 'La fixture non risponde'); }
+  const anyOn = [...S.fixtures.values()].some(x => x.identify);
+  if (!anyOn && dmxForIdentify && S.view !== 'faders') { dmxForIdentify = false; await dmxRelease(); log('rx', 'Uscita DMX fermata (nessun Identify attivo)'); }
   render();
 }
 
@@ -845,6 +859,7 @@ async function ensureSupported(f) {
 async function openFaders(f) {
   S.current = f; S.view = 'faders'; render(); window.scrollTo(0, 0);
   if (!S.connected) return;
+  dmxForIdentify = false;
   dmxBegin();
   const key = `${f.personality}/${f.footprint}`;
   if (f.slots && f.slotsKey === key) return;
@@ -957,7 +972,7 @@ function render(force) {
   const focusId = document.activeElement?.id, selStart = document.activeElement?.selectionStart;
   app.innerHTML = S.view === 'detail' && S.current ? detailView(S.current)
     : S.view === 'faders' && S.current ? faderView(S.current)
-    : S.view === 'home' ? homeView() : S.view === 'dip' ? dipView() : S.view === 'patch' ? patchView()
+    : S.view === 'home' ? homeView() : S.view === 'dip' ? dipView() : S.view === 'patch' ? patchView() : S.view === 'dmx' ? dmxView()
     : listView(S.view === 'fc' ? 'fc' : 'rdm');
   for (const [id, val] of Object.entries(drafts)) { const el = document.getElementById(id); if (el && !el.disabled) el.value = val; }
   if (focusId) { const el = document.getElementById(focusId); if (el) { el.focus(); try { if (selStart != null) el.setSelectionRange(selStart, selStart); } catch {} } }
@@ -1004,6 +1019,10 @@ function homeView() {
     <button class="tile" type="button" data-act="nav" data-to="fc">
       <span class="t-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 3v18M12 3v18M18 3v18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".45"/><rect x="3.5" y="12" width="5" height="3.5" rx="1" fill="currentColor"/><rect x="9.5" y="6" width="5" height="3.5" rx="1" fill="currentColor"/><rect x="15.5" y="15" width="5" height="3.5" rx="1" fill="currentColor"/></svg></span>
       <b>Fixture Control</b><span>Fader sui canali del modo attivo, letti dalla fixture via RDM</span>
+    </button>
+    <button class="tile" type="button" data-act="nav" data-to="dmx">
+      <span class="t-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3" stroke="currentColor" stroke-width="1.8"/><path d="M8 8v8M12 8v8M16 8v8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".45"/><rect x="6.6" y="12" width="2.8" height="2.4" rx=".6" fill="currentColor"/><rect x="10.6" y="9" width="2.8" height="2.4" rx=".6" fill="currentColor"/><rect x="14.6" y="13.5" width="2.8" height="2.4" rx=".6" fill="currentColor"/></svg></span>
+      <b>DMX Output</b><span>Fader sui 512 canali per provare fixture senza banco</span>
     </button>
     <button class="tile" type="button" data-act="nav" data-to="dip">
       <span class="t-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2" stroke="currentColor" stroke-width="1.8"/><rect x="6" y="9" width="2.6" height="3" rx=".6" fill="currentColor"/><rect x="10.7" y="12" width="2.6" height="3" rx=".6" fill="currentColor"/><rect x="15.4" y="9" width="2.6" height="3" rx=".6" fill="currentColor"/></svg></span>
@@ -1317,6 +1336,51 @@ function setPatchField(field, v) {
   store.set('dmxelf.patch', P2); render();
 }
 
+/* ---------- DMX Output: 512 canali a pagine da 16 ---------- */
+const DMX_PAGE = 16;
+function dmxView() {
+  const from = S.dmxPage, to = Math.min(512, from + DMX_PAGE - 1);
+  let lit = 0; for (let c = 1; c <= 512; c++) if (dmx.buf[c]) lit++;
+  const cards = [];
+  for (let ch = from; ch <= to; ch++) {
+    const v = dmx.buf[ch];
+    cards.push(`<div class="fd ${ch === S.dmxTarget ? 'target' : ''} ${v ? 'lit' : ''}">
+      <div class="fd-name" style="height:auto;font-size:.9rem">CH ${pad3(ch)}</div>
+      <div class="fader" data-ch="${ch}" role="slider" tabindex="0" aria-label="Canale ${ch}" aria-valuemin="0" aria-valuemax="255" aria-valuenow="${v}"><div class="fill" style="height:${(v / 2.55).toFixed(1)}%"></div></div>
+      <input class="fd-val" id="fv-${ch}" data-ch="${ch}" type="text" inputmode="numeric" value="${disp(v)}" aria-label="Valore canale ${ch}" ${!S.connected ? 'disabled' : ''}>
+    </div>`);
+  }
+  return `
+  <div><button class="btn ghost back" type="button" data-act="nav" data-to="home">${ico.back} Home</button></div>
+  <section class="panel" aria-label="DMX Output">
+    <div class="panel-head"><p class="sec-title">DMX Output</p><span class="chip ${lit ? '' : 'muted'} num" id="dmx-lit">${lit} canali attivi</span></div>
+    <div class="panel-body">
+      ${!S.connected ? '<p class="note">Collega il DMXelf dalla Home: senza collegamento i fader non inviano DMX.</p>' : ''}
+      <div class="goto"><input class="input" id="dmx-go" type="text" inputmode="numeric" placeholder="Vai al canale (1–512)" autocomplete="off" aria-label="Vai al canale">
+        <button class="btn primary" type="button" data-act="dmx-go">Vai</button></div>
+      <div class="toolbar">
+        <div class="seg" role="group" aria-label="Unità">
+          <button type="button" data-act="unit" data-val="0" aria-pressed="${!S.pct}">0–255</button>
+          <button type="button" data-act="unit" data-val="1" aria-pressed="${S.pct}">%</button>
+        </div>
+        <span class="grow"></span>
+        <button class="btn" type="button" data-act="dmx-zero" ${!S.connected ? 'disabled' : ''}>Azzera tutto</button>
+      </div>
+      <div class="pager">
+        <button class="btn" type="button" data-act="dmx-page" data-d="-1" aria-label="Canali precedenti" ${from <= 1 ? 'disabled' : ''}>${ico.back}</button>
+        <span class="mid">${pad3(from)} – ${pad3(to)}</span>
+        <button class="btn" type="button" data-act="dmx-page" data-d="1" aria-label="Canali successivi" ${to >= 512 ? 'disabled' : ''}>${ico.chev}</button>
+      </div>
+    </div>
+  </section>
+  <section class="faders" aria-label="Canali ${from}–${to}">${cards.join('')}</section>
+  ${dmx.active ? '<p class="note">Uscita DMX attiva. Tornando alla Home i canali vengono azzerati e l\'uscita si ferma.</p>' : ''}`;
+}
+function dmxGoTo(n) {
+  if (!(n >= 1 && n <= 512)) { toast('Canale valido: da 1 a 512'); return; }
+  S.dmxPage = Math.floor((n - 1) / DMX_PAGE) * DMX_PAGE + 1; S.dmxTarget = n; render(true);
+}
+
 const disp = v => S.pct ? Math.round(v / 2.55) : v;
 function faderView(f) {
   const slots = f.slots || [];
@@ -1399,10 +1463,18 @@ document.addEventListener('click', async e => {
     if (to === 'home' && S.scanning) T?.stopScan();
     if (to === 'home') resetList();
     S.view = to; S.current = null; S.confirm = null; clearDrafts(); render(); window.scrollTo(0, 0);
+    if (to === 'dmx' && S.connected) { dmxForIdentify = false; dmxBegin().then(() => render()); }
     if (from === 'home' && (to === 'list' || to === 'fc')) { resetList(); if (S.connected) scan(); }   // ingresso nella sezione: lista nuova + scansione automatica
     return;
   }
   if (act === 'unit') { S.pct = b.dataset.val === '1'; render(); return; }
+  if (act === 'dmx-page') { S.dmxPage = Math.max(1, Math.min(512 - DMX_PAGE + 1, S.dmxPage + Number(b.dataset.d) * DMX_PAGE)); S.dmxTarget = 0; render(); return; }
+  if (act === 'dmx-go') { const inp = $('#dmx-go'); const n = parseInt(inp.value, 10); inp.blur(); dmxGoTo(n); return; }
+  if (act === 'dmx-zero') {
+    dmx.buf.fill(0);
+    if (dmx.active) { dmx.q.clear(); dmxOp(dmxPushFrame).catch(e => log('er', 'DMX: ' + e.message)); }
+    render(); toast('Tutti i canali a zero'); return;
+  }
   if (act === 'dip-sw') { setDip(S.dip.addr ^ Number(b.dataset.w)); return; }
   if (act === 'dip-reset') { setDip(0); return; }
   if (act === 'dip-move') { const n = S.dip.addr + Number(b.dataset.d) * S.dip.step; if (n >= 1 && n <= 511) setDip(n); else toast('Fuori dal range 1–511'); return; }
@@ -1475,7 +1547,11 @@ document.addEventListener('change', e => {
 /* fader: trascinamento relativo (nessun salto quando appoggi il dito) */
 function setFader(ch, v) {
   v = Math.max(0, Math.min(255, Math.round(v)));
+  if (dmx.buf[ch] === v) return;                       // stesso valore: niente invio
   dmxSet(ch, v);
+  document.querySelectorAll(`.fader[data-ch="${ch}"]`).forEach(el => el.closest('.fd')?.classList.toggle('lit', v > 0));
+  const lit = document.getElementById('dmx-lit');
+  if (lit) { let n = 0; for (let c = 1; c <= 512; c++) if (dmx.buf[c]) n++; lit.textContent = `${n} canali attivi`; lit.classList.toggle('muted', !n); }
   document.querySelectorAll(`.fader[data-ch="${ch}"]`).forEach(el => { el.firstElementChild.style.height = (v / 2.55).toFixed(1) + '%'; el.setAttribute('aria-valuenow', v); });
   const inp = document.getElementById('fv-' + ch); if (inp && document.activeElement !== inp) inp.value = disp(v);
 }
@@ -1497,6 +1573,7 @@ document.addEventListener('pointercancel', endDrag);
 document.addEventListener('change', e => {
   const t = e.target;
   if (t.id === 'dip-addr') { const n = parseInt(t.value, 10); if (isNaN(n) || n < 0 || n > 511) { toast('Con 9 switch l\'indirizzo va da 1 a 511'); render(); } else setDip(n); return; }
+  if (t.id === 'dmx-go') { dmxGoTo(parseInt(t.value, 10)); return; }
   if (t.id === 'dip-stepv') { S.dip.step = clampInt(t.value, 1, 511); store.set('dmxelf.dip', S.dip); render(); return; }
   if (t.dataset && t.dataset.field && t.closest('.stepper')) { setPatchField(t.dataset.field, t.value); return; }
   if (t.dataset && t.dataset.pname !== undefined) { S.patch.parts[Number(t.dataset.pname)].name = t.value.trim(); store.set('dmxelf.patch', S.patch); render(); return; }
@@ -1514,7 +1591,7 @@ document.addEventListener('keydown', e => {
     if (e.key in map) { e.preventDefault(); setFader(ch, map[e.key]); }
     return;
   }
-  if (e.key === 'Enter' && e.target.classList && (e.target.classList.contains('fd-val') || e.target.classList.contains('dip-num') || e.target.closest('.stepper') || e.target.closest('.dip-step') || e.target.dataset.pname !== undefined)) e.target.blur();
+  if (e.key === 'Enter' && e.target.classList && (e.target.classList.contains('fd-val') || e.target.classList.contains('dip-num') || e.target.id === 'dmx-go' || e.target.closest('.stepper') || e.target.closest('.dip-step') || e.target.dataset.pname !== undefined)) e.target.blur();
   if (e.key === 'Enter' && e.target.id === 'in-addr') document.querySelector('[data-act="addr-set"]')?.click();
   if (e.key === 'Enter' && e.target.id === 'in-label') document.querySelector('[data-act="label-set"]')?.click();
 });
